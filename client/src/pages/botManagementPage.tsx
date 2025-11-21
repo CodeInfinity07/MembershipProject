@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Network, Link as LinkIcon, LogIn, LogOut, Power, PowerOff, Copy } from "lucide-react";
+import { Network, Link as LinkIcon, LogIn, LogOut, Copy } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -158,52 +158,6 @@ export default function BotManagementPage() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to send token", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    },
-  });
-
-  // Connect all disconnected bots
-  const connectAllMutation = useMutation({
-    mutationFn: async () => {
-      if (!data?.bots) return;
-      const disconnectedBots = data.bots
-        .filter(bot => !bot.connected)
-        .map(bot => bot.botId);
-      
-      return apiRequest('POST', '/api/bots/bulk/connect', { botIds: disconnectedBots });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
-      toast({ title: "Connecting all bots..." });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to connect all bots", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    },
-  });
-
-  // Disconnect all connected bots
-  const disconnectAllMutation = useMutation({
-    mutationFn: async () => {
-      if (!data?.bots) return;
-      const connectedBots = data.bots
-        .filter(bot => bot.connected)
-        .map(bot => bot.botId);
-      
-      return apiRequest('POST', '/api/bots/bulk/disconnect', { botIds: connectedBots });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
-      toast({ title: "Disconnecting all bots..." });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to disconnect all bots", 
         description: error.message,
         variant: "destructive" 
       });
@@ -398,11 +352,11 @@ export default function BotManagementPage() {
       {/* Controls */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+          <CardTitle className="text-base font-semibold">Club Code</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent>
           <div className="space-y-1.5">
-            <Label htmlFor="clubCode" className="text-xs font-semibold">Club Code</Label>
+            <Label htmlFor="clubCode" className="text-xs font-semibold">Enter Club Code</Label>
             <Input
               id="clubCode"
               type="text"
@@ -411,32 +365,6 @@ export default function BotManagementPage() {
               placeholder="Enter club code..."
               className="font-mono text-sm h-9"
             />
-          </div>
-
-          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-            <Button
-              onClick={() => connectAllMutation.mutate()}
-              disabled={connectAllMutation.isPending || disconnectedCount === 0}
-              className="w-full gap-1.5 text-sm"
-              variant="default"
-            >
-              <Power className="h-4 w-4" />
-              Connect All ({disconnectedCount})
-            </Button>
-
-            <Button
-              onClick={() => {
-                if (confirm(`Disconnect all ${stats.connected} connected bots?`)) {
-                  disconnectAllMutation.mutate();
-                }
-              }}
-              disabled={disconnectAllMutation.isPending || stats.connected === 0}
-              className="w-full gap-1.5 text-sm"
-              variant="destructive"
-            >
-              <PowerOff className="h-4 w-4" />
-              Disconnect All ({stats.connected})
-            </Button>
           </div>
         </CardContent>
       </Card>
