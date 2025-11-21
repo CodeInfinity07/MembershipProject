@@ -39,21 +39,52 @@ function startBotServer() {
 
 app.use("/api", async (req: Request, res: Response) => {
   try {
-    const targetUrl = `http://localhost:${BOT_SERVER_PORT}${req.url}`;
+    const targetUrl = `http://localhost:${BOT_SERVER_PORT}/api${req.url}`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
     
-    const response = await fetch(targetUrl, {
+    // Copy relevant headers from the original request
+    if (req.headers["authorization"]) {
+      headers["authorization"] = req.headers["authorization"] as string;
+    }
+    
+    const fetchOptions: RequestInit = {
       method: req.method,
-      headers: {
-        "Content-Type": "application/json",
-        ...req.headers as Record<string, string>,
-      },
-      body: req.method !== "GET" && req.method !== "HEAD" ? JSON.stringify(req.body) : undefined,
-    });
-
-    const data = await response.json();
-    res.status(response.status).json(data);
+      headers,
+    };
+    
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      if (req.body && Object.keys(req.body).length > 0) {
+        fetchOptions.body = JSON.stringify(req.body);
+      }
+    }
+    
+    const response = await fetch(targetUrl, fetchOptions);
+    
+    // Get content type
+    const contentType = response.headers.get("content-type");
+    
+    // Forward status and headers
+    res.status(response.status);
+    if (contentType) {
+      res.setHeader("Content-Type", contentType);
+    }
+    
+    // Parse and forward response
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      const text = await response.text();
+      res.send(text);
+    }
   } catch (error) {
-    console.error("Proxy error:", error);
+    console.error("Proxy error details:", {
+      url: req.url,
+      method: req.method,
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ 
       success: false, 
       message: "Failed to connect to bot server. Please ensure it's running." 
