@@ -21,7 +21,7 @@ const items = [
   },
   {
     title: "Messages",
-    url: "/",
+    url: "/messages",
     icon: MessageSquare,
   },
   {

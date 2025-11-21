@@ -16,12 +16,13 @@ import BotManagementPage from "@/pages/botManagementPage";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={MessagesPage} />
+      <Route path="/" component={BotManagementPage} />
+      <Route path="/bot-management" component={BotManagementPage} />
+      <Route path="/messages" component={MessagesPage} />
       <Route path="/mic" component={MicTaskPage} />
       <Route path="/name-change" component={NameChangePage} />
       <Route path="/loader" component={LoaderPage} />
       <Route path="/membership" component={MembershipPage} />
-      <Route path="/bot-management" component={BotManagementPage} />
       <Route component={NotFound} />
     </Switch>
   );
