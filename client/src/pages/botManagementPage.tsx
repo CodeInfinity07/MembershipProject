@@ -269,6 +269,55 @@ export default function BotManagementPage() {
   const inClubCount = data?.bots?.filter(b => b.inClub).length || 0;
 
   return (
+    <>
+      {/* Auth Prompt Modal */}
+      <Dialog open={!!selectedAuthPrompt} onOpenChange={(open) => {
+        if (!open) setSelectedAuthPrompt(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Authentication Required - {selectedAuthPrompt?.botName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2 max-h-[200px] overflow-auto bg-muted p-3 rounded-md text-xs font-mono">
+              <pre className="whitespace-pre-wrap break-words">
+                {JSON.stringify(selectedAuthPrompt?.message, null, 2)}
+              </pre>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auth-token">Authentication Token</Label>
+              <Input
+                id="auth-token"
+                placeholder="Enter the token from the authentication message"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                disabled={sendTokenMutation.isPending}
+                data-testid="input-auth-token"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => sendTokenMutation.mutate(tokenInput)}
+                disabled={!tokenInput.trim() || sendTokenMutation.isPending}
+                className="flex-1"
+                data-testid="button-send-token"
+              >
+                {sendTokenMutation.isPending ? "Sending..." : "Send Token"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setSelectedAuthPrompt(null)}
+                disabled={sendTokenMutation.isPending}
+                className="flex-1"
+                data-testid="button-cancel-auth"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold mb-2">Bot Management</h1>
@@ -577,5 +626,6 @@ export default function BotManagementPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

@@ -229,13 +229,8 @@ class BotConnection extends EventEmitter {
 
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
-                    reject(new Error('Connection timeout'));
+                    reject(new Error('Connection timeout - awaiting authentication token input'));
                 }, CONFIG.TIMEOUTS.CONNECTION_TIMEOUT);
-
-                this.once('authPrompt', () => {
-                    clearTimeout(timeout);
-                    resolve(true);
-                });
 
                 this.once('authenticated', () => {
                     clearTimeout(timeout);
