@@ -304,10 +304,12 @@ class BotConnection extends EventEmitter {
             this.status = 'awaiting-auth';
             
             // Store auth prompt globally so frontend can fetch it
+            const messageJson = JSON.stringify(msg);
+            const messageBase64 = Buffer.from(messageJson).toString('base64');
             authPrompts.set(this.botId, {
                 botId: this.botId,
                 botName: this.bot.name,
-                message: JSON.stringify(msg),
+                message: messageBase64,
                 rawMessage: msg,
                 timestamp: new Date().toISOString()
             });

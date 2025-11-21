@@ -280,7 +280,7 @@ export default function BotManagementPage() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto min-w-0 space-y-3 px-1">
             <div className="space-y-1">
-              <Label className="text-xs">WebSocket Message Data</Label>
+              <Label className="text-xs">WebSocket Message Data (Base64)</Label>
               <div className="bg-muted p-2 rounded-md text-xs font-mono overflow-x-auto border border-border max-h-[200px] overflow-y-auto">
                 <pre className="whitespace-pre-wrap break-all m-0 text-xs">
                   {selectedAuthPrompt?.message}
