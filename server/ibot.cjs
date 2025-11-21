@@ -650,6 +650,10 @@ class PersistentConnectionManager {
             const connection = new BotConnection(bot, botId);
             Logger.info(`[connectBot] BotConnection created, connection.botId = ${connection.botId}`);
             
+            // ADD CONNECTION TO MAP IMMEDIATELY before connect() so auth prompts can find it
+            this.connections.set(botId, connection);
+            Logger.info(`[connectBot] Connection added to map immediately. Connections now: ${Array.from(this.connections.keys()).join(', ')}`);
+            
             // Handle disconnection
             connection.on('disconnected', () => {
                 Logger.warn(`Bot ${bot.name} disconnected unexpectedly`);
@@ -658,13 +662,13 @@ class PersistentConnectionManager {
 
             await connection.connect();
             
-            this.connections.set(botId, connection);
             Logger.success(`Bot ${bot.name} connected successfully with botId: ${botId}`);
-            Logger.info(`[connectBot] Connections now: ${Array.from(this.connections.keys()).join(', ')}`);
 
             return { success: true, botId };
         } catch (error) {
             Logger.error(`Failed to connect bot ${bot.name}: ${error.message}`);
+            // Remove connection from map if connect failed
+            this.connections.delete(botId);
             return { success: false, message: error.message };
         }
     }
