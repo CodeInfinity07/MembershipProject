@@ -1279,6 +1279,7 @@ app.post('/api/bots/:botId/auth/token', (req, res) => {
 
         const connection = connectionManager.getConnection(botId);
         if (!connection) {
+            Logger.error(`Auth token: Connection not found for botId: ${botId}. Available connections: ${Array.from(connectionManager.connections.keys()).join(', ')}`);
             return res.json({ success: false, message: 'Bot not connected' });
         }
 
@@ -1574,7 +1575,7 @@ app.post('/api/loader/connect', async (req, res) => {
             if (!connection) {
                 const bot = connectionManager.getBot(botId);
                 if (bot) {
-                    connection = new BotConnection(bot);
+                    connection = new BotConnection(bot, botId);
                     connectionManager.addConnection(botId, connection);
                 }
             }
