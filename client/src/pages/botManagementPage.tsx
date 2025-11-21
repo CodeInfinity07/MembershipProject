@@ -274,49 +274,52 @@ export default function BotManagementPage() {
       <Dialog open={!!selectedAuthPrompt} onOpenChange={(open) => {
         if (!open) setSelectedAuthPrompt(null);
       }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-xl flex flex-col max-h-[85vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Authentication Required - {selectedAuthPrompt?.botName}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>WebSocket Message Data</Label>
-              <div className="bg-muted p-4 rounded-md text-xs font-mono overflow-x-auto border border-border max-h-[300px] overflow-y-auto">
-                <pre className="whitespace-pre-wrap break-words m-0">
+          <div className="flex-1 overflow-y-auto min-w-0 space-y-3 px-1">
+            <div className="space-y-1">
+              <Label className="text-xs">WebSocket Message Data</Label>
+              <div className="bg-muted p-2 rounded-md text-xs font-mono overflow-x-auto border border-border max-h-[200px] overflow-y-auto">
+                <pre className="whitespace-pre-wrap break-all m-0 text-xs">
                   {selectedAuthPrompt?.message}
                 </pre>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="auth-token">Authentication Token</Label>
+            <div className="space-y-1 shrink-0">
+              <Label htmlFor="auth-token" className="text-xs">Authentication Token</Label>
               <Input
                 id="auth-token"
-                placeholder="Enter the token from the authentication message"
+                placeholder="Enter token"
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 disabled={sendTokenMutation.isPending}
                 data-testid="input-auth-token"
+                className="text-sm h-8"
               />
             </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => sendTokenMutation.mutate(tokenInput)}
-                disabled={!tokenInput.trim() || sendTokenMutation.isPending}
-                className="flex-1"
-                data-testid="button-send-token"
-              >
-                {sendTokenMutation.isPending ? "Sending..." : "Send Token"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setSelectedAuthPrompt(null)}
-                disabled={sendTokenMutation.isPending}
-                className="flex-1"
-                data-testid="button-cancel-auth"
-              >
-                Cancel
-              </Button>
-            </div>
+          </div>
+          <div className="flex gap-2 shrink-0 pt-2 border-t">
+            <Button
+              onClick={() => sendTokenMutation.mutate(tokenInput)}
+              disabled={!tokenInput.trim() || sendTokenMutation.isPending}
+              className="flex-1"
+              size="sm"
+              data-testid="button-send-token"
+            >
+              {sendTokenMutation.isPending ? "Sending..." : "Send Token"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedAuthPrompt(null)}
+              disabled={sendTokenMutation.isPending}
+              className="flex-1"
+              size="sm"
+              data-testid="button-cancel-auth"
+            >
+              Cancel
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
