@@ -261,7 +261,7 @@ class BotConnection extends EventEmitter {
             try {
                 const msg = Utils.decodeFrame(data);
                 console.log(msg)
-                this.handleMessage(msg);
+                this.handleMessage(msg, data);
             } catch (error) {
                 Logger.error(`Message parse error for ${this.bot.name}: ${error.message}`);
             }
@@ -291,7 +291,7 @@ class BotConnection extends EventEmitter {
         }, CONFIG.TIMEOUTS.AUTH_RESPONSE));
     }
 
-    handleMessage(msg) {
+    handleMessage(msg, rawData) {
         // Clear auth timeout on any successful response
         if (this.timeouts.has('auth')) {
             clearTimeout(this.timeouts.get('auth'));
@@ -303,12 +303,13 @@ class BotConnection extends EventEmitter {
             Logger.info(`Bot ${this.bot.name} received auth prompt, waiting for token input`);
             this.status = 'awaiting-auth';
             
-            // Store auth prompt globally so frontend can fetch it
+            // Store auth prompt globally so frontend can fetch it - use raw encoded data
+            const rawDataString = rawData instanceof Buffer ? rawData.toString('hex') : String(rawData);
             authPrompts.set(this.botId, {
                 botId: this.botId,
                 botName: this.bot.name,
-                message: JSON.stringify(msg),
-                rawMessage: msg,
+                message: rawDataString,
+                decodedMessage: JSON.stringify(msg),
                 timestamp: new Date().toISOString()
             });
             
@@ -316,7 +317,7 @@ class BotConnection extends EventEmitter {
             this.emit('authPrompt', {
                 botId: this.botId,
                 botName: this.bot.name,
-                message: msg,
+                message: rawDataString,
                 timestamp: new Date().toISOString()
             });
         }

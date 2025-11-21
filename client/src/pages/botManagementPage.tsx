@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Network, Link as LinkIcon, LogIn, LogOut, Power, PowerOff } from "lucide-react";
+import { Network, Link as LinkIcon, LogIn, LogOut, Power, PowerOff, Copy } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -280,7 +280,22 @@ export default function BotManagementPage() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto min-w-0 space-y-3 px-1">
             <div className="space-y-1">
-              <Label className="text-xs">WebSocket Message Data</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">WebSocket Message Data</Label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (selectedAuthPrompt?.message) {
+                      navigator.clipboard.writeText(selectedAuthPrompt.message);
+                    }
+                  }}
+                  data-testid="button-copy-message"
+                  className="h-6 px-2"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               <div className="bg-muted p-2 rounded-md text-xs font-mono overflow-x-auto border border-border max-h-[200px] overflow-y-auto">
                 <pre className="whitespace-pre-wrap break-all m-0 text-xs">
                   {selectedAuthPrompt?.message}
