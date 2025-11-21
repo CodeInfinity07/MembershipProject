@@ -274,15 +274,18 @@ export default function BotManagementPage() {
       <Dialog open={!!selectedAuthPrompt} onOpenChange={(open) => {
         if (!open) setSelectedAuthPrompt(null);
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Authentication Required - {selectedAuthPrompt?.botName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2 max-h-[200px] overflow-auto bg-muted p-3 rounded-md text-xs font-mono">
-              <pre className="whitespace-pre-wrap break-words">
-                {JSON.stringify(selectedAuthPrompt?.message, null, 2)}
-              </pre>
+            <div className="space-y-2">
+              <Label>WebSocket Message Data</Label>
+              <div className="bg-muted p-4 rounded-md text-xs font-mono overflow-x-auto border border-border max-h-[300px] overflow-y-auto">
+                <pre className="whitespace-pre-wrap break-words m-0">
+                  {selectedAuthPrompt?.message}
+                </pre>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="auth-token">Authentication Token</Label>

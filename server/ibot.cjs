@@ -307,7 +307,8 @@ class BotConnection extends EventEmitter {
             authPrompts.set(this.botId, {
                 botId: this.botId,
                 botName: this.bot.name,
-                message: msg,
+                message: JSON.stringify(msg),
+                rawMessage: msg,
                 timestamp: new Date().toISOString()
             });
             
