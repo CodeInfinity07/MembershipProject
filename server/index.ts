@@ -98,13 +98,7 @@ if (process.env.NODE_ENV === "development") {
     server: {
       middlewareMode: true,
       allowedHosts: true,
-      hmr: process.env.REPL_ID 
-        ? {
-            protocol: "wss",
-            host: process.env.REPL_URL?.replace(/^https?:\/\//, "") || "localhost",
-            port: 443,
-          }
-        : true,
+      hmr: process.env.REPL_ID ? false : true,
     },
     appType: "spa",
   });

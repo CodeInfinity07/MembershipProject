@@ -75,7 +75,7 @@ export default function BotManagementPage() {
         setSelectedAuthPrompt(null);
       }
     }
-  }, [promptsData, selectedAuthPrompt]);
+  }, [promptsData]);
 
   // Connect bot mutation
   const connectMutation = useMutation({
