@@ -33,19 +33,19 @@ export default function MessagesPage() {
   const { toast } = useToast();
   
   const { data: taskResponse } = useQuery<MessageTaskStatusResponse>({
-    queryKey: ['/api/message-task/status'],
+    queryKey: ['/api/tasks/message/status'],
     refetchInterval: 3000,
   });
 
   const { data: membershipResponse } = useQuery<MembershipStatusResponse>({
-    queryKey: ['/api/membership/status'],
+    queryKey: ['/api/tasks/membership/status'],
     refetchInterval: 3000,
   });
 
   const startMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/message-task/start'),
+    mutationFn: () => apiRequest('POST', '/api/tasks/message/start'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/message-task/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks/message/status'] });
       toast({ title: "Message task started" });
     },
     onError: (error: any) => {
@@ -58,9 +58,9 @@ export default function MessagesPage() {
   });
 
   const stopMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/message-task/stop'),
+    mutationFn: () => apiRequest('POST', '/api/tasks/message/stop'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/message-task/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks/message/status'] });
       toast({ title: "Message task stopped" });
     },
     onError: () => {

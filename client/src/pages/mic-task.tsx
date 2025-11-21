@@ -40,19 +40,19 @@ export default function MicTaskPage() {
   const { toast } = useToast();
   
   const { data: taskResponse } = useQuery<MicTaskStatusResponse>({
-    queryKey: ['/api/mic-task/status'],
+    queryKey: ['/api/tasks/mic/status'],
     refetchInterval: 3000,
   });
 
   const { data: membershipResponse } = useQuery<MembershipStatusResponse>({
-    queryKey: ['/api/membership/status'],
+    queryKey: ['/api/tasks/membership/status'],
     refetchInterval: 3000,
   });
 
   const startMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/mic-task/start'),
+    mutationFn: () => apiRequest('POST', '/api/tasks/mic/start'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mic-task/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks/mic/status'] });
       toast({ title: "Mic task started" });
     },
     onError: (error: any) => {
@@ -65,9 +65,9 @@ export default function MicTaskPage() {
   });
 
   const stopMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/mic-task/stop'),
+    mutationFn: () => apiRequest('POST', '/api/tasks/mic/stop'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mic-task/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks/mic/status'] });
       toast({ title: "Mic task stopped" });
     },
     onError: () => {

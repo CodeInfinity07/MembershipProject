@@ -31,7 +31,7 @@ export default function MembershipPage() {
   const [clubCode, setClubCode] = useState("");
   
   const { data: statusData } = useQuery<MembershipStatusResponse>({
-    queryKey: ['/api/membership/status'],
+    queryKey: ['/api/tasks/membership/status'],
     refetchInterval: 3000, // Poll every 3 seconds
   });
 
@@ -56,13 +56,13 @@ export default function MembershipPage() {
 
   const checkMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/membership/start', { 
+      const response = await apiRequest('POST', '/api/tasks/membership/start', { 
         clubCode
       });
       return response.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/membership/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks/membership/status'] });
       toast({ 
         title: "Membership check started", 
         description: `Checking ${data.totalBots} bots` 
@@ -149,7 +149,7 @@ export default function MembershipPage() {
                   variant="default"
                   className="w-full"
                   data-testid="button-refresh"
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/membership/status'] })}
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/tasks/membership/status'] })}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh
