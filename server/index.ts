@@ -66,6 +66,7 @@ if (process.env.NODE_ENV === "development") {
   const viteDevServer = await vite.createServer({
     server: {
       middlewareMode: true,
+      allowedHosts: true,
       hmr: { server: createServer() },
     },
     appType: "spa",
