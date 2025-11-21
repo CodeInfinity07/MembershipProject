@@ -232,6 +232,11 @@ class BotConnection extends EventEmitter {
                     reject(new Error('Connection timeout'));
                 }, CONFIG.TIMEOUTS.CONNECTION_TIMEOUT);
 
+                this.once('authPrompt', () => {
+                    clearTimeout(timeout);
+                    resolve(true);
+                });
+
                 this.once('authenticated', () => {
                     clearTimeout(timeout);
                     resolve(true);
