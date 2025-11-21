@@ -300,12 +300,13 @@ class BotConnection extends EventEmitter {
 
         // Handle authentication prompt - show message and wait for token input
         if (msg.PY?.hasOwnProperty('IA')) {
-            Logger.info(`Bot ${this.bot.name} received auth prompt, waiting for token input`);
+            Logger.info(`Bot ${this.bot.name} received auth prompt, this.botId = ${this.botId}, waiting for token input`);
             this.status = 'awaiting-auth';
             
             // Store auth prompt globally so frontend can fetch it
             const messageJson = JSON.stringify(msg);
             const messageBase64 = Buffer.from(messageJson).toString('base64');
+            Logger.info(`[AUTH_PROMPT] Storing auth prompt with botId: ${this.botId}`);
             authPrompts.set(this.botId, {
                 botId: this.botId,
                 botName: this.bot.name,
@@ -313,6 +314,7 @@ class BotConnection extends EventEmitter {
                 rawMessage: msg,
                 timestamp: new Date().toISOString()
             });
+            Logger.info(`[AUTH_PROMPT] Auth prompts now: ${Array.from(authPrompts.keys()).join(', ')}`);
             
             // Emit event with the exact message to show in frontend
             this.emit('authPrompt', {
@@ -629,18 +631,24 @@ class PersistentConnectionManager {
     }
 
     async connectBot(botId) {
+        Logger.info(`[connectBot] Starting with botId: ${botId}`);
+        
         // Reuse existing connection if already connected
         if (this.connections.has(botId)) {
+            Logger.info(`[connectBot] Connection already exists for ${botId}`);
             return { success: true, botId, message: 'Using existing connection' };
         }
 
         const bot = this.bots.get(botId);
         if (!bot) {
+            Logger.error(`[connectBot] Bot not found for botId: ${botId}`);
             return { success: false, message: 'Bot not found' };
         }
 
         try {
+            Logger.info(`[connectBot] Creating BotConnection for ${bot.name} with botId: ${botId}`);
             const connection = new BotConnection(bot, botId);
+            Logger.info(`[connectBot] BotConnection created, connection.botId = ${connection.botId}`);
             
             // Handle disconnection
             connection.on('disconnected', () => {
@@ -651,7 +659,8 @@ class PersistentConnectionManager {
             await connection.connect();
             
             this.connections.set(botId, connection);
-            Logger.success(`Bot ${bot.name} connected successfully`);
+            Logger.success(`Bot ${bot.name} connected successfully with botId: ${botId}`);
+            Logger.info(`[connectBot] Connections now: ${Array.from(this.connections.keys()).join(', ')}`);
 
             return { success: true, botId };
         } catch (error) {
@@ -1236,7 +1245,9 @@ app.post('/api/bots/reload', async (req, res) => {
 app.post('/api/bots/:botId/connect', async (req, res) => {
     try {
         const { botId } = req.params;
+        Logger.info(`[CONNECT] Received request to connect bot: ${botId}`);
         const result = await connectionManager.connectBot(botId);
+        Logger.info(`[CONNECT] Result: ${JSON.stringify(result)}`);
         res.json(result);
     } catch (error) {
         Logger.error(`Connect bot error: ${error.message}`);
@@ -1273,16 +1284,21 @@ app.post('/api/bots/:botId/auth/token', (req, res) => {
         const { botId } = req.params;
         const { token } = req.body;
 
+        Logger.info(`[AUTH_TOKEN] Received auth token request for botId: ${botId}`);
+        Logger.info(`[AUTH_TOKEN] Available connections: ${Array.from(connectionManager.connections.keys()).join(', ')}`);
+        Logger.info(`[AUTH_TOKEN] Available auth prompts: ${Array.from(authPrompts.keys()).join(', ')}`);
+
         if (!token) {
             return res.json({ success: false, message: 'Token is required' });
         }
 
         const connection = connectionManager.getConnection(botId);
         if (!connection) {
-            Logger.error(`Auth token: Connection not found for botId: ${botId}. Available connections: ${Array.from(connectionManager.connections.keys()).join(', ')}`);
+            Logger.error(`[AUTH_TOKEN] Connection not found for botId: ${botId}. Available connections: ${Array.from(connectionManager.connections.keys()).join(', ')}`);
             return res.json({ success: false, message: 'Bot not connected' });
         }
 
+        Logger.info(`[AUTH_TOKEN] Found connection for ${botId}, sending token`);
         const success = connection.sendRawMessage(token);
         if (success) {
             authPrompts.delete(botId);
