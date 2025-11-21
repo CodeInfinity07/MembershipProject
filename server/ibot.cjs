@@ -629,8 +629,9 @@ class PersistentConnectionManager {
     }
 
     async connectBot(botId) {
+        // Reuse existing connection if already connected
         if (this.connections.has(botId)) {
-            return { success: false, message: 'Bot already connected' };
+            return { success: true, botId, message: 'Using existing connection' };
         }
 
         const bot = this.bots.get(botId);
@@ -1386,22 +1387,19 @@ app.post('/api/tasks/membership/start', async (req, res) => {
     try {
         const { botIds } = req.body;
         
+        let botsToUse = botIds;
+        
         if (!botIds || !Array.isArray(botIds) || botIds.length === 0) {
-            // Use all connected bots
-            const connectedBots = connectionManager.getAllBotsWithStatus()
-                .filter(b => b.connected && b.source === 'main')
-                .map(b => b.botId);
+            // Use all connected bots - NO reconnection needed
+            botsToUse = connectionManager.getAllConnectedBots();
 
-            if (connectedBots.length === 0) {
+            if (botsToUse.length === 0) {
                 return res.json({ success: false, message: 'No connected bots available' });
             }
-
-            res.json({ success: true, message: `Starting membership task for ${connectedBots.length} bots` });
-            MembershipTask.run(connectedBots);
-        } else {
-            res.json({ success: true, message: `Starting membership task for ${botIds.length} bots` });
-            MembershipTask.run(botIds);
         }
+
+        res.json({ success: true, message: `Starting membership task for ${botsToUse.length} bots` });
+        MembershipTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Membership task error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
@@ -1422,21 +1420,19 @@ app.post('/api/tasks/message/start', async (req, res) => {
     try {
         const { botIds } = req.body;
         
+        let botsToUse = botIds;
+        
         if (!botIds || !Array.isArray(botIds) || botIds.length === 0) {
-            const connectedBots = connectionManager.getAllBotsWithStatus()
-                .filter(b => b.connected && b.source === 'main')
-                .map(b => b.botId);
+            // Use all connected bots - NO reconnection needed
+            botsToUse = connectionManager.getAllConnectedBots();
 
-            if (connectedBots.length === 0) {
+            if (botsToUse.length === 0) {
                 return res.json({ success: false, message: 'No connected bots available' });
             }
-
-            res.json({ success: true, message: `Starting message task for ${connectedBots.length} bots` });
-            MessageTask.run(connectedBots);
-        } else {
-            res.json({ success: true, message: `Starting message task for ${botIds.length} bots` });
-            MessageTask.run(botIds);
         }
+
+        res.json({ success: true, message: `Starting message task for ${botsToUse.length} bots` });
+        MessageTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Message task error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
@@ -1463,21 +1459,19 @@ app.post('/api/tasks/mic/start', async (req, res) => {
     try {
         const { botIds } = req.body;
         
+        let botsToUse = botIds;
+        
         if (!botIds || !Array.isArray(botIds) || botIds.length === 0) {
-            const connectedBots = connectionManager.getAllBotsWithStatus()
-                .filter(b => b.connected && b.source === 'main')
-                .map(b => b.botId);
+            // Use all connected bots - NO reconnection needed
+            botsToUse = connectionManager.getAllConnectedBots();
 
-            if (connectedBots.length === 0) {
+            if (botsToUse.length === 0) {
                 return res.json({ success: false, message: 'No connected bots available' });
             }
-
-            res.json({ success: true, message: `Starting mic task for ${connectedBots.length} bots` });
-            MicTask.run(connectedBots);
-        } else {
-            res.json({ success: true, message: `Starting mic task for ${botIds.length} bots` });
-            MicTask.run(botIds);
         }
+
+        res.json({ success: true, message: `Starting mic task for ${botsToUse.length} bots` });
+        MicTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Mic task error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
