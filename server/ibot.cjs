@@ -1575,10 +1575,14 @@ app.post('/api/loader/connect', async (req, res) => {
         const botIds = botsToConnect.map(b => b.botId);
         
         for (const botId of botIds) {
-            const bot = connectionManager.getBot(botId);
-            if (bot) {
-                const connection = new BotConnection(bot);
-                connectionManager.addConnection(botId, connection);
+            // Check if connection already exists, reuse it instead of creating new one
+            let connection = connectionManager.getConnection(botId);
+            if (!connection) {
+                const bot = connectionManager.getBot(botId);
+                if (bot) {
+                    connection = new BotConnection(bot);
+                    connectionManager.addConnection(botId, connection);
+                }
             }
         }
         

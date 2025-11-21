@@ -533,7 +533,7 @@ export default function BotManagementPage() {
                               disabled={disconnectMutation.isPending}
                               className="flex-1 text-xs h-8 gap-1"
                             >
-                              <PowerOff className="h-3 w-3" />
+                              <Power className="h-3 w-3" />
                               <span className="hidden sm:inline">Disconnect</span>
                             </Button>
                           </>
