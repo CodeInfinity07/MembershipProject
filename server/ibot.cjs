@@ -1524,6 +1524,103 @@ app.get('/api/connections/stats', (req, res) => {
     }
 });
 
+// Loader endpoints
+app.get('/api/loader/status', (req, res) => {
+    try {
+        const allBots = connectionManager.getAllBotsWithStatus();
+        const stats = connectionManager.getStats();
+        
+        res.json({
+            success: true,
+            loaderStatus: {
+                isRunning: TaskState.membership.isRunning || TaskState.message.isRunning || TaskState.mic.isRunning,
+                isConnecting: false,
+                isJoining: TaskState.membership.isRunning,
+                totalBots: stats.totalBots,
+                availableBots: stats.totalBots,
+                connected: stats.connected,
+                joined: allBots.filter(b => b.inClub).length,
+                failed: 0,
+                clubCode: CONFIG.CLUB_CODE.toString(),
+                bots: allBots.map(b => ({
+                    ...b,
+                    connecting: false,
+                    connected: b.connected,
+                    joining: false,
+                    joined: b.inClub,
+                    failed: false,
+                    connectionId: b.botId,
+                    error: null
+                })),
+                sourceFile: CONFIG.BOTS_FILE,
+                activeConnections: []
+            }
+        });
+    } catch (error) {
+        Logger.error(`Loader status error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/loader/connect', async (req, res) => {
+    try {
+        const { clubCode, botCount } = req.body;
+        const allBots = connectionManager.getAllBotsWithStatus();
+        let botsToConnect = allBots.filter(b => !b.connected);
+        
+        if (botCount && botCount > 0) {
+            botsToConnect = botsToConnect.slice(0, botCount);
+        }
+        
+        const botIds = botsToConnect.map(b => b.botId);
+        
+        for (const botId of botIds) {
+            const bot = connectionManager.getBot(botId);
+            if (bot) {
+                const connection = new BotConnection(bot);
+                connectionManager.addConnection(botId, connection);
+            }
+        }
+        
+        res.json({ success: true, message: `Connecting ${botIds.length} bots` });
+    } catch (error) {
+        Logger.error(`Loader connect error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/loader/join', async (req, res) => {
+    try {
+        const connectedBots = connectionManager.getAllConnectedBots();
+        
+        for (const botId of connectedBots) {
+            const connection = connectionManager.getConnection(botId);
+            if (connection && !connection.isInClub) {
+                connection.joinClub(CONFIG.CLUB_CODE);
+            }
+        }
+        
+        res.json({ success: true, message: `Joining ${connectedBots.length} bots to club` });
+    } catch (error) {
+        Logger.error(`Loader join error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/loader/stop', (req, res) => {
+    try {
+        MembershipTask.stop();
+        MessageTask.stop();
+        MicTask.stop();
+        connectionManager.disconnectAll();
+        
+        res.json({ success: true, message: 'Loader stopped' });
+    } catch (error) {
+        Logger.error(`Loader stop error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Dashboard
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
