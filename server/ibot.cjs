@@ -573,7 +573,7 @@ class PersistentConnectionManager {
 
         // Load bots with their existing data
         mainBots.forEach((bot, index) => {
-            const botId = `bot_${bot.name}`;
+            const botId = `bot_${bot.gc}`;
             this.bots.set(botId, {
                 ...bot,
                 botId,
@@ -596,7 +596,7 @@ class PersistentConnectionManager {
         // Store existing data
         const existingData = new Map();
         this.bots.forEach((bot, botId) => {
-            existingData.set(bot.name, {
+            existingData.set(bot.gc, {
                 membership: bot.membership,
                 message: bot.message,
                 micTime: bot.micTime,
@@ -609,8 +609,8 @@ class PersistentConnectionManager {
         const mainBots = await FileManager.loadBots();
 
         mainBots.forEach((bot, index) => {
-            const botId = `bot_${bot.name}`;
-            const existing = existingData.get(bot.name);
+            const botId = `bot_${bot.gc}`;
+            const existing = existingData.get(bot.gc);
             
             this.bots.set(botId, {
                 ...bot,
