@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Network, Link as LinkIcon, LogIn, LogOut, Power, PowerOff } from "lucid
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Bot {
   botId: string;
@@ -31,18 +32,50 @@ interface BotsResponse {
   };
 }
 
+interface AuthPrompt {
+  botId: string;
+  botName: string;
+  message: any;
+  timestamp: string;
+}
+
 export default function BotManagementPage() {
   const { toast } = useToast();
   const [clubCode, setClubCode] = useState("2341357");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "connected" | "disconnected" | "inClub">("all");
   const [filterSource, setFilterSource] = useState<"all" | "main" | "loader">("all");
+  const [authPrompts, setAuthPrompts] = useState<AuthPrompt[]>([]);
+  const [selectedAuthPrompt, setSelectedAuthPrompt] = useState<AuthPrompt | null>(null);
+  const [tokenInput, setTokenInput] = useState("");
   
   // Fetch all bots with status
   const { data, isLoading, error } = useQuery<BotsResponse>({
     queryKey: ['/api/bots'],
     refetchInterval: 2000,
   });
+
+  // Fetch auth prompts
+  const { data: promptsData } = useQuery<{ success: boolean; prompts: AuthPrompt[] }>({
+    queryKey: ['/api/bots/auth/prompts'],
+    refetchInterval: 1000,
+  });
+
+  // Update auth prompts state and show modal
+  useEffect(() => {
+    if (promptsData?.prompts && promptsData.prompts.length > 0) {
+      setAuthPrompts(promptsData.prompts);
+      if (!selectedAuthPrompt && promptsData.prompts.length > 0) {
+        setSelectedAuthPrompt(promptsData.prompts[0]);
+        setTokenInput("");
+      }
+    } else {
+      setAuthPrompts([]);
+      if (selectedAuthPrompt && promptsData?.prompts && promptsData.prompts.length === 0) {
+        setSelectedAuthPrompt(null);
+      }
+    }
+  }, [promptsData, selectedAuthPrompt]);
 
   // Connect bot mutation
   const connectMutation = useMutation({
@@ -103,6 +136,28 @@ export default function BotManagementPage() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to leave club", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Send auth token mutation
+  const sendTokenMutation = useMutation({
+    mutationFn: (token: string) => {
+      if (!selectedAuthPrompt) throw new Error("No auth prompt selected");
+      return apiRequest('POST', `/api/bots/${selectedAuthPrompt.botId}/auth/token`, { token });
+    },
+    onSuccess: () => {
+      toast({ title: "Token sent successfully" });
+      setTokenInput("");
+      setSelectedAuthPrompt(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/bots/auth/prompts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to send token", 
         description: error.message,
         variant: "destructive" 
       });

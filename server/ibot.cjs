@@ -308,6 +308,14 @@ class BotConnection extends EventEmitter {
             Logger.info(`Bot ${this.bot.name} received auth prompt, waiting for token input`);
             this.status = 'awaiting-auth';
             
+            // Store auth prompt globally so frontend can fetch it
+            authPrompts.set(this.botId, {
+                botId: this.botId,
+                botName: this.bot.name,
+                message: msg,
+                timestamp: new Date().toISOString()
+            });
+            
             // Emit event with the exact message to show in frontend
             this.emit('authPrompt', {
                 botId: this.botId,
@@ -725,6 +733,9 @@ class PersistentConnectionManager {
 
 // ==================== GLOBAL CONNECTION MANAGER ====================
 const connectionManager = new PersistentConnectionManager();
+
+// ==================== AUTH PROMPTS STORAGE ====================
+const authPrompts = new Map(); // botId -> { botId, botName, message, timestamp }
 
 // ==================== TASK STATE ====================
 const TaskState = {
@@ -1246,6 +1257,17 @@ app.post('/api/bots/:botId/disconnect', (req, res) => {
     }
 });
 
+// Get pending auth prompts
+app.get('/api/bots/auth/prompts', (req, res) => {
+    try {
+        const prompts = Array.from(authPrompts.values());
+        res.json({ success: true, prompts });
+    } catch (error) {
+        Logger.error(`Get auth prompts error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Send authentication token
 app.post('/api/bots/:botId/auth/token', (req, res) => {
     try {
@@ -1262,6 +1284,9 @@ app.post('/api/bots/:botId/auth/token', (req, res) => {
         }
 
         const success = connection.sendRawMessage(token);
+        if (success) {
+            authPrompts.delete(botId);
+        }
         res.json({ success, message: success ? 'Token sent to bot server' : 'Failed to send token' });
     } catch (error) {
         Logger.error(`Auth token error: ${error.message}`);
