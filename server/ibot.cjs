@@ -298,9 +298,23 @@ class BotConnection extends EventEmitter {
             this.timeouts.delete('auth');
         }
 
-        // Handle authentication response
+        // Handle authentication prompt - show message and wait for token input
         if (msg.PY?.hasOwnProperty('IA')) {
-            Logger.success(`Bot ${this.bot.name} authenticated`);
+            Logger.info(`Bot ${this.bot.name} received auth prompt, waiting for token input`);
+            this.status = 'awaiting-auth';
+            
+            // Emit event with the exact message to show in frontend
+            this.emit('authPrompt', {
+                botId: this.botId,
+                botName: this.bot.name,
+                message: msg,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // Handle actual authentication when AUA is received
+        if (msg.RH === "AUA") {
+            Logger.success(`Bot ${this.bot.name} authenticated via AUA`);
             this.isAuthenticated = true;
             this.status = 'connected';
             
@@ -465,6 +479,20 @@ class BotConnection extends EventEmitter {
         };
 
         return Utils.sendMessage(this.ws, JSON.stringify(msg));
+    }
+
+    sendRawMessage(message) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            try {
+                this.ws.send(message);
+                Logger.debug(`Sent raw message for ${this.bot.name}`);
+                return true;
+            } catch (error) {
+                Logger.error(`Failed to send raw message: ${error.message}`);
+                return false;
+            }
+        }
+        return false;
     }
 
     clearTimeout(name) {
@@ -1209,6 +1237,29 @@ app.post('/api/bots/:botId/disconnect', (req, res) => {
         res.json(result);
     } catch (error) {
         Logger.error(`Disconnect bot error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Send authentication token
+app.post('/api/bots/:botId/auth/token', (req, res) => {
+    try {
+        const { botId } = req.params;
+        const { token } = req.body;
+
+        if (!token) {
+            return res.json({ success: false, message: 'Token is required' });
+        }
+
+        const connection = connectionManager.getConnection(botId);
+        if (!connection) {
+            return res.json({ success: false, message: 'Bot not connected' });
+        }
+
+        const success = connection.sendRawMessage(token);
+        res.json({ success, message: success ? 'Token sent to bot server' : 'Failed to send token' });
+    } catch (error) {
+        Logger.error(`Auth token error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
     }
 });
