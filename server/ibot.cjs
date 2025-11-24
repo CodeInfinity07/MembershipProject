@@ -1268,12 +1268,29 @@ app.post('/api/bots/add', async (req, res) => {
         // Decode the base64 string to get key and ep
         try {
             const decodedStr = Buffer.from(encodedKeyEp.trim(), 'base64').toString('utf-8');
-            const keyEpObj = JSON.parse(decodedStr);
+            Logger.info(`[ADD_BOT] Decoded base64: ${decodedStr.substring(0, 100)}...`);
+            
+            const messageObj = JSON.parse(decodedStr);
+            Logger.info(`[ADD_BOT] Message object parsed, has PY field: ${!!messageObj.PY}`);
+            
+            // Extract KEY and EP from the nested PY field
+            let keyEpObj;
+            if (messageObj.PY) {
+                // PY is a stringified JSON, so we need to parse it
+                keyEpObj = typeof messageObj.PY === 'string' 
+                    ? JSON.parse(messageObj.PY) 
+                    : messageObj.PY;
+                Logger.info(`[ADD_BOT] Extracted from PY: KEY=${!!keyEpObj.KEY}, EP=${!!keyEpObj.EP}`);
+            } else {
+                // Fallback - the object itself might have KEY and EP
+                keyEpObj = messageObj;
+            }
             
             if (!keyEpObj.KEY || !keyEpObj.EP) {
+                Logger.error(`[ADD_BOT] Missing KEY or EP: ${JSON.stringify(keyEpObj).substring(0, 50)}`);
                 return res.json({ 
                     success: false, 
-                    message: 'Base64 decoded data must contain KEY and EP fields' 
+                    message: 'Base64 decoded data must contain KEY and EP fields (check if decoding is correct)' 
                 });
             }
 
