@@ -1589,11 +1589,15 @@ app.post('/api/tasks/membership/start', async (req, res) => {
             botsToUse = connectionManager.getAllConnectedBots();
 
             if (botsToUse.length === 0) {
-                return res.json({ success: false, message: 'No connected bots available' });
+                return res.status(400).json({ success: false, message: 'No connected bots available' });
             }
         }
 
-        res.json({ success: true, message: `Starting membership task for ${botsToUse.length} bots` });
+        res.json({ 
+            success: true, 
+            message: `Starting membership task for ${botsToUse.length} bots`,
+            connectedBots: botsToUse.length
+        });
         MembershipTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Membership task error: ${error.message}`);
@@ -1640,11 +1644,15 @@ app.post('/api/tasks/message/start', async (req, res) => {
             botsToUse = connectionManager.getAllConnectedBots();
 
             if (botsToUse.length === 0) {
-                return res.json({ success: false, message: 'No connected bots available' });
+                return res.status(400).json({ success: false, message: 'No connected bots available' });
             }
         }
 
-        res.json({ success: true, message: `Starting message task for ${botsToUse.length} bots` });
+        res.json({ 
+            success: true, 
+            message: `Starting message task for ${botsToUse.length} bots`,
+            connectedBots: botsToUse.length
+        });
         MessageTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Message task error: ${error.message}`);
@@ -1699,11 +1707,15 @@ app.post('/api/tasks/mic/start', async (req, res) => {
             botsToUse = connectionManager.getAllConnectedBots();
 
             if (botsToUse.length === 0) {
-                return res.json({ success: false, message: 'No connected bots available' });
+                return res.status(400).json({ success: false, message: 'No connected bots available' });
             }
         }
 
-        res.json({ success: true, message: `Starting mic task for ${botsToUse.length} bots` });
+        res.json({ 
+            success: true, 
+            message: `Starting mic task for ${botsToUse.length} bots`,
+            connectedBots: botsToUse.length
+        });
         MicTask.run(botsToUse);
     } catch (error) {
         Logger.error(`Mic task error: ${error.message}`);

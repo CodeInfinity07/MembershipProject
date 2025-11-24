@@ -65,7 +65,7 @@ export default function MembershipPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/tasks/membership/status'] });
       toast({ 
         title: "Membership check started", 
-        description: `Checking ${data.totalBots} bots` 
+        description: data.connectedBots ? `Checking ${data.connectedBots} connected bots` : "Check started" 
       });
     },
     onError: () => {
