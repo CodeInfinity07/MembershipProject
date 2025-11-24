@@ -5,7 +5,7 @@ interface StatusBadgeProps {
   status: BotStatus;
 }
 
-const statusConfig: Record<BotStatus, { label: string; className: string }> = {
+const statusConfig: Record<BotStatus | string, { label: string; className: string }> = {
   idle: { label: "Idle", className: "bg-muted text-muted-foreground" },
   member: { label: "Member", className: "bg-success/20 text-success border-success/30" },
   "non-member": { label: "Non-Member", className: "bg-destructive/20 text-destructive border-destructive/30" },
@@ -15,10 +15,11 @@ const statusConfig: Record<BotStatus, { label: string; className: string }> = {
   processing: { label: "Processing", className: "bg-warning/20 text-warning border-warning/30" },
   completed: { label: "Completed", className: "bg-success/20 text-success border-success/30" },
   failed: { label: "Failed", className: "bg-destructive/20 text-destructive border-destructive/30" },
+  disconnected: { label: "Disconnected", className: "bg-muted text-muted-foreground" },
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig.idle;
   
   return (
     <Badge 

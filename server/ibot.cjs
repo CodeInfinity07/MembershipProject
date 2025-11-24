@@ -1536,7 +1536,46 @@ app.post('/api/bots/bulk/disconnect', (req, res) => {
 
 // Membership task
 app.get('/api/tasks/membership/status', (req, res) => {
-    res.json({ success: true, status: TaskState.membership });
+    try {
+        const allBots = connectionManager.getAllBotsWithStatus();
+        const stats = connectionManager.getStats();
+        const taskState = TaskState.membership;
+        
+        // Convert results Map to an object for JSON serialization
+        const resultsObj = {};
+        taskState.results.forEach((value, key) => {
+            resultsObj[key] = value;
+        });
+        
+        // Merge bot data with membership results
+        const botsWithMembership = allBots.map(bot => {
+            const botId = `bot_${bot.gc}`;
+            const membershipData = resultsObj[botId];
+            return {
+                ...bot,
+                ...(membershipData && { membership: membershipData })
+            };
+        });
+        
+        res.json({ 
+            success: true,
+            isChecking: taskState.isRunning,
+            totalBots: stats.totalBots,
+            connectedBots: stats.connected,
+            completed: taskState.completed,
+            failed: taskState.failed,
+            bots: botsWithMembership,
+            summary: {
+                total: stats.totalBots,
+                members: botsWithMembership.filter(b => b.membership?.member === true).length,
+                messageComplete: botsWithMembership.filter(b => b.membership?.message === true).length,
+                micComplete: botsWithMembership.filter(b => b.membership?.micTime).length
+            }
+        });
+    } catch (error) {
+        Logger.error(`Membership status error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.post('/api/tasks/membership/start', async (req, res) => {
@@ -1569,7 +1608,25 @@ app.post('/api/tasks/membership/stop', (req, res) => {
 
 // Message task
 app.get('/api/tasks/message/status', (req, res) => {
-    res.json({ success: true, status: TaskState.message });
+    try {
+        const allBots = connectionManager.getAllBotsWithStatus();
+        const stats = connectionManager.getStats();
+        const taskState = TaskState.message;
+        
+        res.json({ 
+            success: true,
+            isChecking: taskState.isRunning,
+            totalBots: stats.totalBots,
+            connectedBots: stats.connected,
+            completed: taskState.completed,
+            failed: taskState.failed,
+            completedBots: Array.from(taskState.completedBots),
+            bots: allBots
+        });
+    } catch (error) {
+        Logger.error(`Message status error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.post('/api/tasks/message/start', async (req, res) => {
@@ -1602,13 +1659,33 @@ app.post('/api/tasks/message/stop', (req, res) => {
 
 // Mic task
 app.get('/api/tasks/mic/status', (req, res) => {
-    res.json({ 
-        success: true, 
-        status: {
-            ...TaskState.mic,
-            activeCount: TaskState.mic.active.size
-        }
-    });
+    try {
+        const allBots = connectionManager.getAllBotsWithStatus();
+        const stats = connectionManager.getStats();
+        const taskState = TaskState.mic;
+        
+        // Convert active Map to an object for JSON serialization
+        const activeObj = {};
+        taskState.active.forEach((value, key) => {
+            activeObj[key] = value;
+        });
+        
+        res.json({ 
+            success: true,
+            isChecking: taskState.isRunning,
+            totalBots: stats.totalBots,
+            connectedBots: stats.connected,
+            completed: taskState.completed,
+            failed: taskState.failed,
+            activeCount: taskState.active.size,
+            active: activeObj,
+            completedBots: Array.from(taskState.completedBots),
+            bots: allBots
+        });
+    } catch (error) {
+        Logger.error(`Mic status error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 app.post('/api/tasks/mic/start', async (req, res) => {

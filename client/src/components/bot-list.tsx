@@ -6,7 +6,7 @@ import { List } from "lucide-react";
 
 interface BotListProps {
   title: string;
-  bots: Bot[];
+  bots: (Bot & { botId?: string })[];
   emptyMessage?: string;
   icon?: React.ReactNode;
   iconColor?: string;
@@ -35,9 +35,9 @@ export function BotList({
         ) : (
           <ScrollArea className="h-[300px] rounded-md bg-background p-4">
             <div className="space-y-1">
-              {bots.map((bot) => (
+              {bots.map((bot, idx) => (
                 <div
-                  key={bot.id}
+                  key={bot.botId || bot.id || idx}
                   className={`flex items-center justify-between p-3 rounded-md bg-muted/30 border-l-2 ${
                     bot.status === 'member' ? 'border-l-success' :
                     bot.status === 'non-member' ? 'border-l-destructive' :
@@ -46,7 +46,7 @@ export function BotList({
                     bot.status === 'joining' ? 'border-l-warning' :
                     'border-l-muted'
                   }`}
-                  data-testid={`bot-item-${bot.id}`}
+                  data-testid={`bot-item-${bot.botId || bot.id || idx}`}
                 >
                   <span className="text-sm font-mono">{bot.name}</span>
                   <StatusBadge status={bot.status} />
