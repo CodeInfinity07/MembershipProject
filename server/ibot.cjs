@@ -1302,13 +1302,17 @@ app.post('/api/bots/add', async (req, res) => {
                 ui: ui.trim(),
                 name: name.trim()
             };
+            
+            Logger.info(`[ADD_BOT] Created new bot object: gc=${newBot.gc}, name=${newBot.name}`);
 
             // Load existing bots
             const bots = await FileManager.loadBots();
+            Logger.info(`[ADD_BOT] Loaded ${bots.length} existing bots`);
             
             // Check for duplicates
             const isDuplicate = bots.some(bot => bot.gc === newBot.gc);
             if (isDuplicate) {
+                Logger.warn(`[ADD_BOT] Bot with gc '${newBot.gc}' already exists`);
                 return res.json({ 
                     success: false, 
                     message: `Bot with gc '${newBot.gc}' already exists` 
@@ -1317,23 +1321,27 @@ app.post('/api/bots/add', async (req, res) => {
 
             // Add new bot
             bots.push(newBot);
+            Logger.info(`[ADD_BOT] Added bot to array, now ${bots.length} bots total`);
             
             // Save to both locations
             await FileManager.saveBots(bots);
+            Logger.info(`[ADD_BOT] Saved to server fukrey.json`);
             
             // Also sync to root fukrey.json
             const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
+            Logger.info(`[ADD_BOT] Root fukrey path: ${rootFukreyPath}`);
             try {
                 await fs.writeFile(rootFukreyPath, JSON.stringify(bots, null, 2));
-                Logger.info(`Synced new bot to root fukrey.json`);
+                Logger.info(`[ADD_BOT] Synced new bot to root fukrey.json`);
             } catch (syncError) {
-                Logger.warn(`Could not sync to root fukrey.json: ${syncError.message}`);
+                Logger.warn(`[ADD_BOT] Could not sync to root fukrey.json: ${syncError.message}`);
             }
 
             Logger.success(`Added new bot: ${newBot.name} (${newBot.gc})`);
             
             // Reload connection manager to include new bot
             const count = await connectionManager.reloadBots();
+            Logger.info(`[ADD_BOT] Reloaded bots, now ${count} total`);
             
             res.json({ 
                 success: true, 
