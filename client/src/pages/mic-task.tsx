@@ -97,11 +97,22 @@ export default function MicTaskPage() {
   // Filter eligible bots from membership data
   // Eligible = member AND has not completed mic task yet
   const allBots = membershipResponse?.bots || [];
-  const eligibleBots = allBots.filter(bot => 
-    bot.hasOwnProperty('membership') && 
-    (bot as any).membership === true && 
-    !(bot as any).micTime
-  );
+  const eligibleBots = allBots.filter(bot => {
+    const membership = (bot as any).membership;
+    let isMember = false;
+    let micComplete = false;
+    
+    // Handle membership as object or boolean
+    if (typeof membership === 'object' && membership !== null) {
+      isMember = membership.membership === true;
+      micComplete = membership.micTime === true;
+    } else {
+      isMember = membership === true;
+      micComplete = (bot as any).micTime === true;
+    }
+    
+    return isMember && !micComplete;
+  });
 
   return (
     <div className="space-y-6">

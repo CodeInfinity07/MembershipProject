@@ -87,11 +87,22 @@ export default function MessagesPage() {
   // Filter eligible bots from membership data
   // Eligible = member AND has not completed message task yet
   const allBots = membershipResponse?.bots || [];
-  const eligibleBots = allBots.filter(bot => 
-    bot.hasOwnProperty('membership') && 
-    (bot as any).membership === true && 
-    !(bot as any).message
-  );
+  const eligibleBots = allBots.filter(bot => {
+    const membership = (bot as any).membership;
+    let isMember = false;
+    let messageComplete = false;
+    
+    // Handle membership as object or boolean
+    if (typeof membership === 'object' && membership !== null) {
+      isMember = membership.membership === true;
+      messageComplete = membership.message === true;
+    } else {
+      isMember = membership === true;
+      messageComplete = (bot as any).message === true;
+    }
+    
+    return isMember && !messageComplete;
+  });
 
   return (
     <div className="space-y-6">
