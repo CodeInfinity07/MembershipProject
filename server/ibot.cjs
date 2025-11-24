@@ -832,6 +832,13 @@ const MembershipTask = {
                 
                 // Update bot data immediately
                 connectionManager.updateBotData(botId, result.data);
+                
+                // Exit club after membership check
+                const connection = connectionManager.getConnection(botId);
+                if (connection) {
+                    connection.leaveClub();
+                    Logger.info(`Bot ${botId} exiting club after membership check`);
+                }
             } else {
                 TaskState.membership.failed++;
                 Logger.error(`Membership check failed for ${botId}: ${result.error}`);
@@ -853,18 +860,35 @@ const MembershipTask = {
         try {
             const allBots = Array.from(connectionManager.bots.values());
             
-            const botsToSave = allBots.map(bot => ({
-                name: bot.name,
-                key: bot.key,
-                ep: bot.ep,
-                gc: bot.gc,
-                snuid: bot.snuid,
-                ui: bot.ui,
-                membership: bot.membership || false,
-                message: bot.message || false,
-                micTime: bot.micTime || false,
-                lastChecked: bot.lastChecked || null
-            }));
+            const botsToSave = allBots.map(bot => {
+                // Extract membership data properly - bot.membership might be an object from GOMPA response
+                let membershipValue = false;
+                let messageValue = false;
+                let micTimeValue = false;
+                
+                if (typeof bot.membership === 'object' && bot.membership !== null) {
+                    membershipValue = bot.membership.membership === true;
+                    messageValue = bot.membership.message === true;
+                    micTimeValue = bot.membership.micTime === true;
+                } else if (typeof bot.membership === 'boolean') {
+                    membershipValue = bot.membership;
+                    messageValue = bot.message || false;
+                    micTimeValue = bot.micTime || false;
+                }
+                
+                return {
+                    name: bot.name,
+                    key: bot.key,
+                    ep: bot.ep,
+                    gc: bot.gc,
+                    snuid: bot.snuid,
+                    ui: bot.ui,
+                    membership: membershipValue,
+                    message: messageValue,
+                    micTime: micTimeValue,
+                    lastChecked: bot.lastChecked || null
+                };
+            });
 
             await FileManager.saveBots(botsToSave);
             
@@ -983,18 +1007,35 @@ const MessageTask = {
         try {
             const allBots = Array.from(connectionManager.bots.values());
             
-            const botsToSave = allBots.map(bot => ({
-                name: bot.name,
-                key: bot.key,
-                ep: bot.ep,
-                gc: bot.gc,
-                snuid: bot.snuid,
-                ui: bot.ui,
-                membership: bot.membership || false,
-                message: bot.message || false,
-                micTime: bot.micTime || false,
-                lastChecked: bot.lastChecked || null
-            }));
+            const botsToSave = allBots.map(bot => {
+                // Extract membership data properly
+                let membershipValue = false;
+                let messageValue = false;
+                let micTimeValue = false;
+                
+                if (typeof bot.membership === 'object' && bot.membership !== null) {
+                    membershipValue = bot.membership.membership === true;
+                    messageValue = bot.membership.message === true;
+                    micTimeValue = bot.membership.micTime === true;
+                } else if (typeof bot.membership === 'boolean') {
+                    membershipValue = bot.membership;
+                    messageValue = bot.message || false;
+                    micTimeValue = bot.micTime || false;
+                }
+                
+                return {
+                    name: bot.name,
+                    key: bot.key,
+                    ep: bot.ep,
+                    gc: bot.gc,
+                    snuid: bot.snuid,
+                    ui: bot.ui,
+                    membership: membershipValue,
+                    message: messageValue || false,
+                    micTime: micTimeValue || false,
+                    lastChecked: bot.lastChecked || null
+                };
+            });
 
             await FileManager.saveBots(botsToSave);
             Logger.success('Message task results saved to file');
@@ -1130,18 +1171,35 @@ const MicTask = {
         try {
             const allBots = Array.from(connectionManager.bots.values());
             
-            const botsToSave = allBots.map(bot => ({
-                name: bot.name,
-                key: bot.key,
-                ep: bot.ep,
-                gc: bot.gc,
-                snuid: bot.snuid,
-                ui: bot.ui,
-                membership: bot.membership || false,
-                message: bot.message || false,
-                micTime: bot.micTime || false,
-                lastChecked: bot.lastChecked || null
-            }));
+            const botsToSave = allBots.map(bot => {
+                // Extract membership data properly
+                let membershipValue = false;
+                let messageValue = false;
+                let micTimeValue = false;
+                
+                if (typeof bot.membership === 'object' && bot.membership !== null) {
+                    membershipValue = bot.membership.membership === true;
+                    messageValue = bot.membership.message === true;
+                    micTimeValue = bot.membership.micTime === true;
+                } else if (typeof bot.membership === 'boolean') {
+                    membershipValue = bot.membership;
+                    messageValue = bot.message || false;
+                    micTimeValue = bot.micTime || false;
+                }
+                
+                return {
+                    name: bot.name,
+                    key: bot.key,
+                    ep: bot.ep,
+                    gc: bot.gc,
+                    snuid: bot.snuid,
+                    ui: bot.ui,
+                    membership: membershipValue,
+                    message: messageValue || false,
+                    micTime: micTimeValue || false,
+                    lastChecked: bot.lastChecked || null
+                };
+            });
 
             await FileManager.saveBots(botsToSave);
             Logger.success('Mic task results saved to file');
@@ -1567,9 +1625,9 @@ app.get('/api/tasks/membership/status', (req, res) => {
             bots: botsWithMembership,
             summary: {
                 total: stats.totalBots,
-                members: botsWithMembership.filter(b => b.membership?.member === true).length,
+                members: botsWithMembership.filter(b => b.membership?.membership === true || b.membership === true).length,
                 messageComplete: botsWithMembership.filter(b => b.membership?.message === true).length,
-                micComplete: botsWithMembership.filter(b => b.membership?.micTime).length
+                micComplete: botsWithMembership.filter(b => b.membership?.micTime === true).length
             }
         });
     } catch (error) {

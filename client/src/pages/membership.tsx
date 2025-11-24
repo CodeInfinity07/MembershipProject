@@ -36,13 +36,21 @@ export default function MembershipPage() {
   });
 
   // Transform the data to separate members and non-members
-  const memberBots = statusData?.bots?.filter(bot => 
-    bot.hasOwnProperty('membership') && (bot as any).membership === true
-  ) || [];
+  const memberBots = statusData?.bots?.filter(bot => {
+    const membership = (bot as any).membership;
+    if (typeof membership === 'object' && membership !== null) {
+      return membership.membership === true;
+    }
+    return membership === true;
+  }) || [];
   
-  const nonMemberBots = statusData?.bots?.filter(bot => 
-    bot.hasOwnProperty('membership') && (bot as any).membership === false
-  ) || [];
+  const nonMemberBots = statusData?.bots?.filter(bot => {
+    const membership = (bot as any).membership;
+    if (typeof membership === 'object' && membership !== null) {
+      return membership.membership === false;
+    }
+    return membership === false;
+  }) || [];
 
   const updateClubMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/config/club-code', { clubCode }),
