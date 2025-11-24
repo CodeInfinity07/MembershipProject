@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Network, Link as LinkIcon, LogIn, LogOut, Copy, Power, Plus } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -173,17 +174,34 @@ export default function BotManagementPage() {
       return response.json();
     },
     onSuccess: (data: any) => {
+      const successCount = data.results?.filter((r: any) => r.success).length || 0;
+      const failCount = data.results?.filter((r: any) => !r.success).length || 0;
+      
+      let description = "";
+      if (successCount > 0) {
+        description = `Added ${successCount} bot${successCount !== 1 ? 's' : ''}`;
+        if (failCount > 0) {
+          description += `, ${failCount} failed`;
+        }
+      } else if (failCount > 0) {
+        description = `Failed to add ${failCount} bot${failCount !== 1 ? 's' : ''}`;
+      }
+      
       toast({ 
-        title: "Bot added successfully",
-        description: `Added '${data.bot.name}' with ${data.totalBots} total bots`
+        title: data.success ? "Bots added" : "Partial success",
+        description: description || data.message,
+        variant: data.success ? "default" : "destructive"
       });
-      setBotDataInput("");
-      setShowAddBotDialog(false);
+      
+      if (data.success) {
+        setBotDataInput("");
+        setShowAddBotDialog(false);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
     },
     onError: (error: any) => {
       toast({ 
-        title: "Failed to add bot", 
+        title: "Failed to add bots", 
         description: error.message,
         variant: "destructive" 
       });
@@ -258,18 +276,19 @@ export default function BotManagementPage() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto min-w-0 space-y-4 px-0.5">
             <div className="space-y-2">
-              <Label htmlFor="botData" className="text-sm font-medium">Bot Data (base64EncodedKeyEp,ui,gc,name)</Label>
+              <Label htmlFor="botData" className="text-sm font-medium">Bot Data (one per line)</Label>
               <p className="text-xs text-muted-foreground">
-                Format: Paste your bot data as shown above. The first field will be decoded to extract KEY and EP.
+                Format: base64EncodedKeyEp,ui,gc,name (one bot per line). You can add multiple bots at once.
               </p>
-              <Input
+              <Textarea
                 id="botData"
-                placeholder='Example: eyJSSCI6ImpvIi4uLn0sNjdiNjBmODdkZDNiNjVjMDAwMTNjZTMxOSxSSFJb0FINUFqSUZBQjk0MDAwMQ,ui,gc,name'
+                placeholder='Example:&#10;eyJSSCI6ImpvIi4uLn0sNjdiNjBmODdkZDNiNjVjMDAwMTNjZTMxOSxSSFJb0FINUFqSUZBQjk0MDAwMQ,67b86babd3b65c00013da1a3,BOT0001,Bot One&#10;eyJSSCI6ImpvIi4uLn0sNjdiNjBmODdkZDNiNjVjMDAwMTNjZTMxOSxSSFJb0FINUFqSUZBQjk0MDAwMQ,67b86babd3b65c00013da1a3,BOT0002,Bot Two'
                 value={botDataInput}
                 onChange={(e) => setBotDataInput(e.target.value)}
                 disabled={addBotMutation.isPending}
                 data-testid="input-bot-data"
-                className="text-sm h-9 font-mono text-xs"
+                className="text-sm font-mono text-xs resize-none"
+                rows={8}
               />
             </div>
           </div>
@@ -281,7 +300,7 @@ export default function BotManagementPage() {
               size="sm"
               data-testid="button-confirm-add-bot"
             >
-              {addBotMutation.isPending ? "Adding..." : "Add Bot"}
+              {addBotMutation.isPending ? "Adding..." : "Add Bots"}
             </Button>
             <Button
               variant="outline"

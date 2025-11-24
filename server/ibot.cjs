@@ -1245,117 +1245,135 @@ app.post('/api/bots/reload', async (req, res) => {
     }
 });
 
-// Add new bot
+// Helper function to process a single bot entry
+async function processBotEntry(botDataLine, existingBots, rootFukreyPath) {
+    const parts = botDataLine.split(',');
+    if (parts.length < 4) {
+        return { 
+            success: false, 
+            message: 'Invalid format. Expected: base64EncodedKeyEp,ui,gc,name' 
+        };
+    }
+
+    const [encodedKeyEp, ui, gc, ...nameParts] = parts;
+    const name = nameParts.join(',').trim();
+
+    try {
+        const decodedStr = Buffer.from(encodedKeyEp.trim(), 'base64').toString('utf-8');
+        const messageObj = JSON.parse(decodedStr);
+        
+        // Extract KEY and EP from the nested PY field
+        let keyEpObj;
+        if (messageObj.PY) {
+            keyEpObj = typeof messageObj.PY === 'string' 
+                ? JSON.parse(messageObj.PY) 
+                : messageObj.PY;
+        } else {
+            keyEpObj = messageObj;
+        }
+        
+        if (!keyEpObj.KEY || !keyEpObj.EP) {
+            return { 
+                success: false, 
+                message: `Bot '${name}': Base64 decoded data must contain KEY and EP fields` 
+            };
+        }
+
+        // Create bot object
+        const newBot = {
+            key: keyEpObj.KEY,
+            ep: keyEpObj.EP,
+            gc: gc.trim(),
+            ui: ui.trim(),
+            name: name.trim()
+        };
+
+        // Check for duplicates
+        const isDuplicate = existingBots.some(bot => bot.gc === newBot.gc);
+        if (isDuplicate) {
+            return { 
+                success: false, 
+                message: `Bot '${newBot.name}' (${newBot.gc}): Already exists` 
+            };
+        }
+
+        return { 
+            success: true, 
+            bot: newBot 
+        };
+    } catch (error) {
+        return { 
+            success: false, 
+            message: `Bot '${name}': Failed to process - ${error.message}` 
+        };
+    }
+}
+
+// Add new bots (supports multiple entries, one per line)
 app.post('/api/bots/add', async (req, res) => {
     try {
         const { botData } = req.body;
-        if (!botData) {
+        if (!botData || !botData.trim()) {
             return res.json({ success: false, message: 'Bot data is required' });
         }
 
-        // Parse format: base64EncodedKeyEp,ui,gc,name
-        const parts = botData.split(',');
-        if (parts.length < 4) {
-            return res.json({ 
-                success: false, 
-                message: 'Invalid format. Expected: base64EncodedKeyEp,ui,gc,name' 
-            });
+        // Split by newlines and filter empty lines
+        const botLines = botData
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
+
+        if (botLines.length === 0) {
+            return res.json({ success: false, message: 'No bot data provided' });
         }
 
-        const [encodedKeyEp, ui, gc, ...nameParts] = parts;
-        const name = nameParts.join(',').trim(); // Handle names with commas
+        Logger.info(`[ADD_BOT] Processing ${botLines.length} bot entries`);
 
-        // Decode the base64 string to get key and ep
-        try {
-            const decodedStr = Buffer.from(encodedKeyEp.trim(), 'base64').toString('utf-8');
-            Logger.info(`[ADD_BOT] Decoded base64: ${decodedStr.substring(0, 100)}...`);
+        // Load existing bots once
+        const bots = await FileManager.loadBots();
+        const results = [];
+        const addedBots = [];
+
+        // Process each bot entry
+        for (const botLine of botLines) {
+            const result = await processBotEntry(botLine, bots, null);
             
-            const messageObj = JSON.parse(decodedStr);
-            Logger.info(`[ADD_BOT] Message object parsed, has PY field: ${!!messageObj.PY}`);
-            
-            // Extract KEY and EP from the nested PY field
-            let keyEpObj;
-            if (messageObj.PY) {
-                // PY is a stringified JSON, so we need to parse it
-                keyEpObj = typeof messageObj.PY === 'string' 
-                    ? JSON.parse(messageObj.PY) 
-                    : messageObj.PY;
-                Logger.info(`[ADD_BOT] Extracted from PY: KEY=${!!keyEpObj.KEY}, EP=${!!keyEpObj.EP}`);
+            if (result.success) {
+                bots.push(result.bot);
+                addedBots.push(result.bot);
+                results.push({ success: true, name: result.bot.name, gc: result.bot.gc });
+                Logger.success(`Added bot: ${result.bot.name} (${result.bot.gc})`);
             } else {
-                // Fallback - the object itself might have KEY and EP
-                keyEpObj = messageObj;
+                results.push({ success: false, message: result.message });
+                Logger.warn(`Failed to add bot: ${result.message}`);
             }
-            
-            if (!keyEpObj.KEY || !keyEpObj.EP) {
-                Logger.error(`[ADD_BOT] Missing KEY or EP: ${JSON.stringify(keyEpObj).substring(0, 50)}`);
-                return res.json({ 
-                    success: false, 
-                    message: 'Base64 decoded data must contain KEY and EP fields (check if decoding is correct)' 
-                });
-            }
+        }
 
-            // Create bot object
-            const newBot = {
-                key: keyEpObj.KEY,
-                ep: keyEpObj.EP,
-                gc: gc.trim(),
-                ui: ui.trim(),
-                name: name.trim()
-            };
-            
-            Logger.info(`[ADD_BOT] Created new bot object: gc=${newBot.gc}, name=${newBot.name}`);
-
-            // Load existing bots
-            const bots = await FileManager.loadBots();
-            Logger.info(`[ADD_BOT] Loaded ${bots.length} existing bots`);
-            
-            // Check for duplicates
-            const isDuplicate = bots.some(bot => bot.gc === newBot.gc);
-            if (isDuplicate) {
-                Logger.warn(`[ADD_BOT] Bot with gc '${newBot.gc}' already exists`);
-                return res.json({ 
-                    success: false, 
-                    message: `Bot with gc '${newBot.gc}' already exists` 
-                });
-            }
-
-            // Add new bot
-            bots.push(newBot);
-            Logger.info(`[ADD_BOT] Added bot to array, now ${bots.length} bots total`);
-            
-            // Save to both locations
+        // Save all bots to both locations
+        if (addedBots.length > 0) {
             await FileManager.saveBots(bots);
             Logger.info(`[ADD_BOT] Saved to server fukrey.json`);
             
-            // Also sync to root fukrey.json
             const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
-            Logger.info(`[ADD_BOT] Root fukrey path: ${rootFukreyPath}`);
             try {
                 await fs.writeFile(rootFukreyPath, JSON.stringify(bots, null, 2));
-                Logger.info(`[ADD_BOT] Synced new bot to root fukrey.json`);
+                Logger.info(`[ADD_BOT] Synced to root fukrey.json`);
             } catch (syncError) {
-                Logger.warn(`[ADD_BOT] Could not sync to root fukrey.json: ${syncError.message}`);
+                Logger.warn(`Could not sync to root fukrey.json: ${syncError.message}`);
             }
 
-            Logger.success(`Added new bot: ${newBot.name} (${newBot.gc})`);
-            
-            // Reload connection manager to include new bot
+            // Reload connection manager
             const count = await connectionManager.reloadBots();
             Logger.info(`[ADD_BOT] Reloaded bots, now ${count} total`);
-            
-            res.json({ 
-                success: true, 
-                message: `Bot '${newBot.name}' added successfully`,
-                bot: newBot,
-                totalBots: count
-            });
-        } catch (decodeError) {
-            Logger.error(`Failed to decode base64 data: ${decodeError.message}`);
-            return res.json({ 
-                success: false, 
-                message: 'Failed to decode base64 data. Ensure it contains valid JSON with KEY and EP fields.' 
-            });
         }
+
+        res.json({ 
+            success: addedBots.length > 0, 
+            message: `Added ${addedBots.length} of ${botLines.length} bots`,
+            results,
+            addedBots,
+            totalBots: bots.length
+        });
     } catch (error) {
         Logger.error(`Add bot error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
