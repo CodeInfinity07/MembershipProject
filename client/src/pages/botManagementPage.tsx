@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Network, Link as LinkIcon, LogIn, LogOut, Copy, Power, Plus } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -280,15 +279,14 @@ export default function BotManagementPage() {
               <p className="text-xs text-muted-foreground">
                 Format: base64EncodedKeyEp,ui,gc,name (one bot per line). You can add multiple bots at once.
               </p>
-              <Textarea
+              <Input
                 id="botData"
-                placeholder='Example:&#10;eyJSSCI6ImpvIi4uLn0sNjdiNjBmODdkZDNiNjVjMDAwMTNjZTMxOSxSSFJb0FINUFqSUZBQjk0MDAwMQ,67b86babd3b65c00013da1a3,BOT0001,Bot One&#10;eyJSSCI6ImpvIi4uLn0sNjdiNjBmODdkZDNiNjVjMDAwMTNjZTMxOSxSSFJb0FINUFqSUZBQjk0MDAwMQ,67b86babd3b65c00013da1a3,BOT0002,Bot Two'
+                placeholder='Paste bot data here. Multiple bots on separate lines.'
                 value={botDataInput}
                 onChange={(e) => setBotDataInput(e.target.value)}
                 disabled={addBotMutation.isPending}
                 data-testid="input-bot-data"
-                className="text-sm font-mono text-xs resize-none"
-                rows={8}
+                className="text-sm font-mono text-xs h-24"
               />
             </div>
           </div>
