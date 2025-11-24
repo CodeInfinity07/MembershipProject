@@ -59,6 +59,10 @@ export default function MembershipPage() {
       const response = await apiRequest('POST', '/api/tasks/membership/start', { 
         clubCode
       });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to start check');
+      }
       return response.json();
     },
     onSuccess: (data: any) => {
@@ -68,8 +72,14 @@ export default function MembershipPage() {
         description: data.connectedBots ? `Checking ${data.connectedBots} connected bots` : "Check started" 
       });
     },
-    onError: () => {
-      toast({ title: "Failed to check membership", variant: "destructive" });
+    onError: (error: any) => {
+      const message = error?.message === 'No connected bots available' 
+        ? 'No connected bots. Connect bots first via "Connect Bots" page'
+        : 'Failed to check membership';
+      toast({ 
+        title: message, 
+        variant: "destructive" 
+      });
     },
   });
 

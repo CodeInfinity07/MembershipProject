@@ -50,15 +50,24 @@ export default function MicTaskPage() {
   });
 
   const startMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/tasks/mic/start'),
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/tasks/mic/start');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to start task');
+      }
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tasks/mic/status'] });
       toast({ title: "Mic task started" });
     },
     onError: (error: any) => {
+      const message = error?.message === 'No connected bots available' 
+        ? 'No connected bots. Connect bots first via "Connect Bots" page'
+        : error.message || 'Failed to start task';
       toast({ 
-        title: "Failed to start task", 
-        description: error.message || "Unknown error",
+        title: message, 
         variant: "destructive" 
       });
     },
