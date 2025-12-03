@@ -606,7 +606,7 @@ export default function BotManagementPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">Add Bot</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
             <Button
               onClick={() => setShowAddBotDialog(true)}
               className="w-full"
@@ -614,6 +614,15 @@ export default function BotManagementPage() {
             >
               <Plus className="h-4 w-4 mr-2" />
               Add New Bot
+            </Button>
+            <Button
+              onClick={() => setImportDialogOpen(true)}
+              variant="outline"
+              className="w-full"
+              data-testid="button-import-bot"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Import Bot
             </Button>
           </CardContent>
         </Card>
