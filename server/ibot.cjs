@@ -1651,12 +1651,37 @@ app.post('/api/bots/import-v2', async (req, res) => {
         
         Logger.info(`[IMPORT_BOT_V2] PY object keys: ${Object.keys(pyData).join(', ')}`);
         
-        // Extract bot details from response - search starting from PY
-        let gc = pyData.GC || findField(pyData, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
-        let name = pyData.NM || findField(pyData, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
-        let ui = pyData.UI || findField(pyData, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
-        let key = pyData.KEY || findField(pyData, ['KEY', 'key', 'apiKey', 'api_key']) || '';
-        let ep = pyData.EP || findField(pyData, ['EP', 'ep', 'endpoint', 'end_point']) || '';
+        // Enhanced deep search for fields - searches entire object tree
+        const deepSearch = (obj, fieldNames, depth = 0) => {
+            if (depth > 30) return null;
+            if (!obj || typeof obj !== 'object') return null;
+            
+            // Direct check
+            for (const field of fieldNames) {
+                if (obj[field] !== undefined && obj[field] !== null && obj[field] !== '') {
+                    return obj[field];
+                }
+            }
+            
+            // Search all values recursively
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    const val = obj[key];
+                    if (val && typeof val === 'object') {
+                        const result = deepSearch(val, fieldNames, depth + 1);
+                        if (result !== null) return result;
+                    }
+                }
+            }
+            return null;
+        };
+        
+        // Extract bot details from response - deep search entire structure
+        let gc = deepSearch(botInfo, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
+        let name = deepSearch(botInfo, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
+        let ui = deepSearch(botInfo, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
+        let key = deepSearch(botInfo, ['KEY', 'key', 'apiKey', 'api_key']) || '';
+        let ep = deepSearch(botInfo, ['EP', 'ep', 'endpoint', 'end_point']) || '';
         
         Logger.info(`[IMPORT_BOT_V2] Extracted fields: gc="${gc}", name="${name}", ui="${ui}", key="${String(key).substring(0, 20)}", ep="${String(ep).substring(0, 20)}"`);
         
