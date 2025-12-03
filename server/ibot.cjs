@@ -1618,32 +1618,46 @@ app.post('/api/bots/import-v2', async (req, res) => {
         
         Logger.info(`[IMPORT_BOT_V2] Extracted bot info: ${JSON.stringify(botInfo)}`);
         
-        // Recursively search for bot fields in nested objects
-        const findField = (obj, fieldNames) => {
+        // Deep recursive search that logs what it finds
+        const findField = (obj, fieldNames, depth = 0) => {
+            if (depth > 20) return null; // Prevent infinite recursion
             if (!obj || typeof obj !== 'object') return null;
             
+            // Check direct properties first
             for (const field of fieldNames) {
-                if (obj[field] !== undefined && obj[field] !== null) return obj[field];
+                if (obj[field] !== undefined && obj[field] !== null) {
+                    Logger.info(`[IMPORT_BOT_V2] Found field '${field}' = ${JSON.stringify(obj[field]).substring(0, 100)}`);
+                    return obj[field];
+                }
             }
             
+            // Check all nested values
             for (const key in obj) {
-                const val = findField(obj[key], fieldNames);
-                if (val !== null) return val;
+                const value = obj[key];
+                if (value && typeof value === 'object') {
+                    const result = findField(value, fieldNames, depth + 1);
+                    if (result !== null) return result;
+                }
             }
             
             return null;
         };
         
+        Logger.info(`[IMPORT_BOT_V2] Starting field extraction from botInfo: ${JSON.stringify(botInfo).substring(0, 200)}`);
+        
         // Extract bot details from response - search recursively
-        let gc = findField(botInfo, ['gc', 'GC', 'groupCode', 'group_code', 'gid', 'GID']);
-        let name = findField(botInfo, ['name', 'NAME', 'botName', 'bot_name', 'NM']);
-        let ui = findField(botInfo, ['ui', 'UI', 'userId', 'user_id', 'uid', 'UID']) || '';
-        let key = findField(botInfo, ['key', 'KEY', 'apiKey', 'api_key', 'KEY']) || '';
-        let ep = findField(botInfo, ['ep', 'EP', 'endpoint', 'end_point', 'EP']) || '';
+        let gc = findField(botInfo, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
+        let name = findField(botInfo, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
+        let ui = findField(botInfo, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
+        let key = findField(botInfo, ['KEY', 'key', 'apiKey', 'api_key']) || '';
+        let ep = findField(botInfo, ['EP', 'ep', 'endpoint', 'end_point']) || '';
+        
+        Logger.info(`[IMPORT_BOT_V2] Extracted fields: gc=${gc}, name=${name}, ui=${ui}, key=${key}, ep=${ep}`);
         
         if (!gc || !name) {
             Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc=${gc}, name=${name}`);
-            return res.status(400).json({ success: false, message: 'Response payload must contain gc and name fields. Extracted: ' + JSON.stringify({ gc, name }) });
+            Logger.error(`[IMPORT_BOT_V2] Full botInfo structure: ${JSON.stringify(botInfo)}`);
+            return res.status(400).json({ success: false, message: `Response payload must contain gc and name fields. Extracted: gc=${gc}, name=${name}. Full structure: ${JSON.stringify(botInfo).substring(0, 500)}` });
         }
         
         // Create bot object
