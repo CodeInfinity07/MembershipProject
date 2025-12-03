@@ -1590,6 +1590,51 @@ app.post('/api/bots/bulk/disconnect', (req, res) => {
     }
 });
 
+// Delete bot
+app.delete('/api/bots/:botId', async (req, res) => {
+    try {
+        const { botId } = req.params;
+        
+        // Disconnect the bot first
+        connectionManager.disconnectBot(botId);
+        
+        // Remove from connection manager
+        connectionManager.removeBot(botId);
+        
+        // Load bots from file
+        let bots = await FileManager.loadBots();
+        
+        // Find and remove the bot
+        const initialCount = bots.length;
+        bots = bots.filter(bot => {
+            const bid = `bot_${bot.gc}`;
+            return bid !== botId;
+        });
+        
+        if (bots.length === initialCount) {
+            return res.status(404).json({ success: false, message: 'Bot not found' });
+        }
+        
+        // Save updated bots to both locations
+        await FileManager.saveBots(bots);
+        Logger.info(`[DELETE_BOT] Deleted bot: ${botId}`);
+        
+        // Sync to root fukrey.json
+        const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
+        try {
+            await fs.writeFile(rootFukreyPath, JSON.stringify(bots, null, 2));
+            Logger.info(`[DELETE_BOT] Synced deletion to root fukrey.json`);
+        } catch (syncError) {
+            Logger.warn(`Could not sync deletion to root fukrey.json: ${syncError.message}`);
+        }
+        
+        res.json({ success: true, message: 'Bot deleted successfully', totalBots: bots.length });
+    } catch (error) {
+        Logger.error(`Delete bot error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // ==================== TASK ROUTES ====================
 
 // Membership task

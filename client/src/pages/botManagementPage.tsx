@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Network, Link as LinkIcon, LogIn, LogOut, Copy, Power, Plus } from "lucide-react";
+import { Network, Link as LinkIcon, LogIn, LogOut, Copy, Power, Plus, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -270,6 +270,49 @@ export default function BotManagementPage() {
 
   return (
     <>
+      {/* Delete Bot Confirmation Modal */}
+      <Dialog open={!!botToDelete} onOpenChange={(open) => {
+        if (!open) setBotToDelete(null);
+      }}>
+        <DialogContent className="sm:max-w-md flex flex-col max-h-[90vh] w-[95vw]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-lg">Delete Bot</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-w-0 space-y-3 px-0.5">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>{botToDelete?.name}</strong>? This action cannot be undone and the bot will be removed from the JSON file.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0 pt-3 border-t">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (botToDelete) {
+                  deleteMutation.mutate(botToDelete.botId);
+                  setBotToDelete(null);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="flex-1"
+              size="sm"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setBotToDelete(null)}
+              disabled={deleteMutation.isPending}
+              className="flex-1"
+              size="sm"
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Import Bots Dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh] w-[95vw]">
@@ -711,6 +754,17 @@ export default function BotManagementPage() {
                             </Button>
                           </>
                         )}
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setBotToDelete({ botId: bot.botId, name: bot.name })}
+                          className="flex-1 text-xs h-8 gap-1"
+                          data-testid={`button-delete-bot-${bot.botId}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
