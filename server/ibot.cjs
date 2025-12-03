@@ -1553,28 +1553,66 @@ app.post('/api/bots/import-v2', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required fields: requestPayload, responsePayload, token' });
         }
         
-        // Parse response payload (should be JSON with bot details)
-        let botInfo;
-        try {
-            botInfo = typeof responsePayload === 'string' ? JSON.parse(responsePayload) : responsePayload;
-        } catch (e) {
-            return res.status(400).json({ success: false, message: 'Invalid response payload JSON format' });
+        // Helper function to extract JSON from text with random content
+        const extractJSON = (text) => {
+            if (typeof text !== 'string') return null;
+            
+            // Try direct parse first
+            try {
+                return JSON.parse(text);
+            } catch (e) {}
+            
+            // Look for JSON objects in the text
+            const jsonMatches = text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
+            if (jsonMatches) {
+                for (const match of jsonMatches) {
+                    try {
+                        return JSON.parse(match);
+                    } catch (e) {}
+                }
+            }
+            
+            // Look for JSON arrays
+            const arrayMatches = text.match(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g);
+            if (arrayMatches) {
+                for (const match of arrayMatches) {
+                    try {
+                        const parsed = JSON.parse(match);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            return parsed[0];
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            return null;
+        };
+        
+        // Extract bot info from response payload
+        let botInfo = extractJSON(responsePayload);
+        
+        if (!botInfo) {
+            return res.status(400).json({ success: false, message: 'Could not extract valid JSON from response payload. Ensure it contains JSON with bot details.' });
         }
         
-        // Extract bot details from response
-        const { gc, name, ui, key, ep } = botInfo;
+        // Extract bot details from response - be flexible with field names
+        let gc = botInfo.gc || botInfo.GC || botInfo.groupCode || botInfo.group_code;
+        let name = botInfo.name || botInfo.NAME || botInfo.botName || botInfo.bot_name;
+        let ui = botInfo.ui || botInfo.UI || botInfo.userId || botInfo.user_id || '';
+        let key = botInfo.key || botInfo.KEY || botInfo.apiKey || botInfo.api_key || '';
+        let ep = botInfo.ep || botInfo.EP || botInfo.endpoint || botInfo.end_point || '';
         
         if (!gc || !name) {
-            return res.status(400).json({ success: false, message: 'Response payload must contain gc and name fields' });
+            return res.status(400).json({ success: false, message: 'Response payload must contain gc/groupCode and name/botName fields' });
         }
         
         // Create bot object
         const newBot = {
-            key: key || '',
-            ep: ep || '',
-            gc: gc.trim(),
-            ui: ui || '',
-            name: name.trim()
+            key: String(key).trim(),
+            ep: String(ep).trim(),
+            gc: String(gc).trim(),
+            ui: String(ui).trim(),
+            name: String(name).trim()
         };
         
         // Load existing bots
