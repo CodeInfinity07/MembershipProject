@@ -1598,9 +1598,6 @@ app.delete('/api/bots/:botId', async (req, res) => {
         // Disconnect the bot first
         connectionManager.disconnectBot(botId);
         
-        // Remove from connection manager
-        connectionManager.removeBot(botId);
-        
         // Load bots from file
         let bots = await FileManager.loadBots();
         
