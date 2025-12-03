@@ -51,8 +51,6 @@ export default function BotManagementPage() {
   const [tokenInput, setTokenInput] = useState("");
   const [showAddBotDialog, setShowAddBotDialog] = useState(false);
   const [botDataInput, setBotDataInput] = useState("");
-  const [requestPayload, setRequestPayload] = useState("");
-  const [responsePayload, setResponsePayload] = useState("");
   
   // Fetch all bots with status
   const { data, isLoading, error } = useQuery<BotsResponse>({
@@ -349,61 +347,6 @@ export default function BotManagementPage() {
                 </pre>
               </div>
             </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-medium">Request Payload</Label>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    navigator.clipboard.writeText(requestPayload);
-                    toast({ description: "Request payload copied to clipboard" });
-                  }}
-                  data-testid="button-copy-request-payload"
-                  className="h-7 w-7"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <Textarea
-                placeholder="Request payload will appear here"
-                value={requestPayload}
-                onChange={(e) => setRequestPayload(e.target.value)}
-                data-testid="textarea-request-payload"
-                className="text-xs font-mono resize-none"
-                rows={3}
-                readOnly={true}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs font-medium">Response Payload</Label>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    navigator.clipboard.writeText(responsePayload);
-                    toast({ description: "Response payload copied to clipboard" });
-                  }}
-                  data-testid="button-copy-response-payload"
-                  className="h-7 w-7"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-              <Textarea
-                placeholder="Response payload will appear here"
-                value={responsePayload}
-                onChange={(e) => setResponsePayload(e.target.value)}
-                data-testid="textarea-response-payload"
-                className="text-xs font-mono resize-none"
-                rows={3}
-                readOnly={true}
-              />
-            </div>
-
             <div className="space-y-1.5 shrink-0">
               <Label htmlFor="auth-token" className="text-xs font-medium">Authentication Token</Label>
               <Input
