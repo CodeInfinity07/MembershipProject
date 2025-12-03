@@ -1544,14 +1544,38 @@ app.post('/api/bots/:botId/leave', (req, res) => {
     }
 });
 
-// Helper function to extract JSON from text (handles HTTP headers)
+// Helper function to extract JSON from text (handles HTTP headers and truncated responses)
 function extractJSON(text) {
     const trimmed = text.trim();
     const jsonStart = trimmed.indexOf('{');
     if (jsonStart === -1) {
         throw new Error('No JSON object found in text');
     }
-    return JSON.parse(trimmed.substring(jsonStart));
+    
+    // Try to find the longest valid JSON object
+    let jsonStr = trimmed.substring(jsonStart);
+    let lastValid = null;
+    let braceCount = 0;
+    
+    for (let i = 0; i < jsonStr.length; i++) {
+        const char = jsonStr[i];
+        if (char === '{') braceCount++;
+        if (char === '}') braceCount--;
+        
+        if (braceCount === 0 && i > 0) {
+            // Found a complete JSON object
+            try {
+                const candidate = jsonStr.substring(0, i + 1);
+                const parsed = JSON.parse(candidate);
+                lastValid = parsed;
+            } catch (e) {}
+        }
+    }
+    
+    if (lastValid) return lastValid;
+    
+    // Fallback to simple parsing
+    return JSON.parse(jsonStr);
 }
 
 // Import bot v2 - using request/response payloads and token (same as reference script)
