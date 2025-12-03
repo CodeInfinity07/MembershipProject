@@ -49,8 +49,6 @@ export default function BotManagementPage() {
   const [authPrompts, setAuthPrompts] = useState<AuthPrompt[]>([]);
   const [selectedAuthPrompt, setSelectedAuthPrompt] = useState<AuthPrompt | null>(null);
   const [tokenInput, setTokenInput] = useState("");
-  const [showAddBotDialog, setShowAddBotDialog] = useState(false);
-  const [botDataInput, setBotDataInput] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [requestPayload, setRequestPayload] = useState("");
   const [responsePayload, setResponsePayload] = useState("");
@@ -212,47 +210,6 @@ export default function BotManagementPage() {
     },
   });
 
-  // Add bot mutation
-  const addBotMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/bots/add', { botData: botDataInput });
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      const successCount = data.results?.filter((r: any) => r.success).length || 0;
-      const failCount = data.results?.filter((r: any) => !r.success).length || 0;
-      
-      let description = "";
-      if (successCount > 0) {
-        description = `Added ${successCount} bot${successCount !== 1 ? 's' : ''}`;
-        if (failCount > 0) {
-          description += `, ${failCount} failed`;
-        }
-      } else if (failCount > 0) {
-        description = `Failed to add ${failCount} bot${failCount !== 1 ? 's' : ''}`;
-      }
-      
-      toast({ 
-        title: data.success ? "Bots added" : "Partial success",
-        description: description || data.message,
-        variant: data.success ? "default" : "destructive"
-      });
-      
-      if (data.success) {
-        setBotDataInput("");
-        setShowAddBotDialog(false);
-      }
-      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Failed to add bots", 
-        description: error.message,
-        variant: "destructive" 
-      });
-    },
-  });
-
   // Format uptime
   const formatUptime = (ms: number) => {
     if (ms === 0) return "N/A";
@@ -313,54 +270,6 @@ export default function BotManagementPage() {
 
   return (
     <>
-      {/* Add Bot Dialog */}
-      <Dialog open={showAddBotDialog} onOpenChange={setShowAddBotDialog}>
-        <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh] w-[95vw]">
-          <DialogHeader className="shrink-0">
-            <DialogTitle className="text-lg">Add New Bot</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-w-0 space-y-4 px-0.5">
-            <div className="space-y-2">
-              <Label htmlFor="botData" className="text-sm font-medium">Bot Data (one per line)</Label>
-              <p className="text-xs text-muted-foreground">
-                Format: base64EncodedKeyEp,ui,gc,name (one bot per line). You can add multiple bots at once.
-              </p>
-              <Textarea
-                id="botData"
-                placeholder='Paste bot data here. Multiple bots on separate lines.'
-                value={botDataInput}
-                onChange={(e) => setBotDataInput(e.target.value)}
-                disabled={addBotMutation.isPending}
-                data-testid="input-bot-data"
-                className="text-sm font-mono text-xs resize-none"
-                rows={6}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2 shrink-0 pt-3 border-t">
-            <Button
-              onClick={() => addBotMutation.mutate()}
-              disabled={!botDataInput.trim() || addBotMutation.isPending}
-              className="flex-1"
-              size="sm"
-              data-testid="button-confirm-add-bot"
-            >
-              {addBotMutation.isPending ? "Adding..." : "Add Bots"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowAddBotDialog(false)}
-              disabled={addBotMutation.isPending}
-              className="flex-1"
-              size="sm"
-              data-testid="button-cancel-add-bot"
-            >
-              Cancel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Import Bots Dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh] w-[95vw]">
@@ -606,18 +515,9 @@ export default function BotManagementPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">Add Bot</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Button
-              onClick={() => setShowAddBotDialog(true)}
-              className="w-full"
-              data-testid="button-add-bot"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Bot
-            </Button>
+          <CardContent>
             <Button
               onClick={() => setImportDialogOpen(true)}
-              variant="outline"
               className="w-full"
               data-testid="button-import-bot"
             >
