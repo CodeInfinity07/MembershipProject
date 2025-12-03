@@ -329,15 +329,29 @@ export default function BotManagementPage() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="import-token" className="text-xs font-medium">Token</Label>
-              <Input
-                id="import-token"
-                placeholder="Enter token"
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-medium">Token</Label>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard.writeText(token);
+                    toast({ description: "Token copied to clipboard" });
+                  }}
+                  data-testid="button-copy-token"
+                  className="h-7 w-7"
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <Textarea
+                placeholder="Paste token here"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                data-testid="input-import-token"
-                className="text-sm h-9"
+                data-testid="textarea-import-token"
+                className="text-xs font-mono resize-none"
+                rows={4}
               />
             </div>
           </div>
