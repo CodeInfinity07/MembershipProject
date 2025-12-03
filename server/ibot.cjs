@@ -1616,79 +1616,87 @@ app.post('/api/bots/import-v2', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Could not extract valid JSON from response payload. Ensure it contains JSON with bot details.' });
         }
         
-        Logger.info(`[IMPORT_BOT_V2] Extracted bot info keys: ${Object.keys(botInfo).join(', ')}`);
+        Logger.info(`[IMPORT_BOT_V2] Full botInfo payload: ${JSON.stringify(botInfo).substring(0, 500)}`);
+        Logger.info(`[IMPORT_BOT_V2] Root keys: ${Object.keys(botInfo).join(', ')}`);
         
-        // Try to extract from PY object first (most common structure)
-        let pyData = botInfo.PY || botInfo;
-        Logger.info(`[IMPORT_BOT_V2] Using data source: ${botInfo.PY ? 'PY object' : 'root object'}`);
-        
-        // Deep recursive search that logs what it finds
-        const findField = (obj, fieldNames, depth = 0) => {
-            if (depth > 20) return null; // Prevent infinite recursion
-            if (!obj || typeof obj !== 'object') return null;
+        // Extremely aggressive deep search - searches ENTIRE structure
+        const getAllValues = (obj, depth = 0, results = {}) => {
+            if (depth > 30 || !obj || typeof obj !== 'object') return results;
             
-            // Check direct properties first (case-sensitive)
-            for (const field of fieldNames) {
-                if (obj.hasOwnProperty(field) && obj[field] !== undefined && obj[field] !== null) {
-                    Logger.info(`[IMPORT_BOT_V2] Found field '${field}' = ${JSON.stringify(obj[field]).substring(0, 100)}`);
-                    return obj[field];
-                }
-            }
-            
-            // Check all nested values
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    const value = obj[key];
-                    if (value && typeof value === 'object') {
-                        const result = findField(value, fieldNames, depth + 1);
-                        if (result !== null) return result;
-                    }
-                }
-            }
-            
-            return null;
-        };
-        
-        Logger.info(`[IMPORT_BOT_V2] PY object keys: ${Object.keys(pyData).join(', ')}`);
-        
-        // Enhanced deep search for fields - searches entire object tree
-        const deepSearch = (obj, fieldNames, depth = 0) => {
-            if (depth > 30) return null;
-            if (!obj || typeof obj !== 'object') return null;
-            
-            // Direct check
-            for (const field of fieldNames) {
-                if (obj[field] !== undefined && obj[field] !== null && obj[field] !== '') {
-                    return obj[field];
-                }
-            }
-            
-            // Search all values recursively
             for (const key in obj) {
                 if (obj.hasOwnProperty(key)) {
                     const val = obj[key];
+                    results[key] = val;
+                    
                     if (val && typeof val === 'object') {
-                        const result = deepSearch(val, fieldNames, depth + 1);
-                        if (result !== null) return result;
+                        Object.assign(results, getAllValues(val, depth + 1, results));
                     }
                 }
             }
-            return null;
+            return results;
         };
         
-        // Extract bot details from response - deep search entire structure
-        let gc = deepSearch(botInfo, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
-        let name = deepSearch(botInfo, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
-        let ui = deepSearch(botInfo, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
-        let key = deepSearch(botInfo, ['KEY', 'key', 'apiKey', 'api_key']) || '';
-        let ep = deepSearch(botInfo, ['EP', 'ep', 'endpoint', 'end_point']) || '';
+        const allValues = getAllValues(botInfo);
+        Logger.info(`[IMPORT_BOT_V2] All available keys found: ${Object.keys(allValues).slice(0, 20).join(', ')}`);
         
-        Logger.info(`[IMPORT_BOT_V2] Extracted fields: gc="${gc}", name="${name}", ui="${ui}", key="${String(key).substring(0, 20)}", ep="${String(ep).substring(0, 20)}"`);
+        // Search for bot fields - check all extracted values
+        const fieldSets = {
+            gc: ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID'],
+            name: ['NM', 'name', 'NAME', 'botName', 'bot_name'],
+            ui: ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID'],
+            key: ['KEY', 'key', 'apiKey', 'api_key'],
+            ep: ['EP', 'ep', 'endpoint', 'end_point']
+        };
+        
+        let gc = null, name = null, ui = '', key = '', ep = '';
+        
+        // Try to find each field in all values
+        for (const field of fieldSets.gc) {
+            if (allValues[field]) {
+                gc = allValues[field];
+                Logger.info(`[IMPORT_BOT_V2] Found GC field '${field}' = ${String(gc).substring(0, 50)}`);
+                break;
+            }
+        }
+        
+        for (const field of fieldSets.name) {
+            if (allValues[field]) {
+                name = allValues[field];
+                Logger.info(`[IMPORT_BOT_V2] Found NM field '${field}' = ${String(name).substring(0, 50)}`);
+                break;
+            }
+        }
+        
+        for (const field of fieldSets.ui) {
+            if (allValues[field]) {
+                ui = allValues[field];
+                Logger.info(`[IMPORT_BOT_V2] Found UI field '${field}' = ${String(ui).substring(0, 50)}`);
+                break;
+            }
+        }
+        
+        for (const field of fieldSets.key) {
+            if (allValues[field]) {
+                key = allValues[field];
+                Logger.info(`[IMPORT_BOT_V2] Found KEY field '${field}' = ${String(key).substring(0, 20)}`);
+                break;
+            }
+        }
+        
+        for (const field of fieldSets.ep) {
+            if (allValues[field]) {
+                ep = allValues[field];
+                Logger.info(`[IMPORT_BOT_V2] Found EP field '${field}' = ${String(ep).substring(0, 20)}`);
+                break;
+            }
+        }
+        
+        Logger.info(`[IMPORT_BOT_V2] Final extracted fields: gc="${gc}", name="${name}"`);
         
         if (!gc || !name) {
             Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc="${gc}", name="${name}"`);
-            Logger.error(`[IMPORT_BOT_V2] Available top-level keys in PY: ${Object.keys(pyData).join(', ')}`);
-            return res.status(400).json({ success: false, message: `Missing fields: gc="${gc}", name="${name}". Available keys: ${Object.keys(pyData).join(', ')}` });
+            Logger.error(`[IMPORT_BOT_V2] All keys in payload: ${Object.keys(allValues).join(', ')}`);
+            return res.status(400).json({ success: false, message: `GC or NM field not found in payload. Searched for: ${fieldSets.gc.concat(fieldSets.name).join(', ')}. Available keys: ${Object.keys(allValues).slice(0, 30).join(', ')}` });
         }
         
         // Create bot object
