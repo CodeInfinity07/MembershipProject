@@ -1553,11 +1553,31 @@ app.post('/api/bots/import-v2', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required fields: requestPayload, responsePayload, token' });
         }
         
+        // Helper function to decode frame (same as in BotConnection)
+        const decodeFrame = (frame) => {
+            try {
+                // Try to decode as base64
+                const jsonString = Buffer.from(frame, 'base64').toString('utf-8');
+                return JSON.parse(jsonString);
+            } catch (error) {
+                try {
+                    // If base64 fails, try direct JSON parse
+                    return JSON.parse(frame);
+                } catch (e) {
+                    return null;
+                }
+            }
+        };
+        
         // Helper function to extract JSON from text with random content
         const extractJSON = (text) => {
             if (typeof text !== 'string') return null;
             
-            // Try direct parse first
+            // Try decoding as base64 first
+            const decoded = decodeFrame(text);
+            if (decoded && typeof decoded === 'object') return decoded;
+            
+            // Try direct parse
             try {
                 return JSON.parse(text);
             } catch (e) {}
@@ -1592,18 +1612,38 @@ app.post('/api/bots/import-v2', async (req, res) => {
         let botInfo = extractJSON(responsePayload);
         
         if (!botInfo) {
+            Logger.error(`[IMPORT_BOT_V2] Could not extract JSON from response payload: ${responsePayload.substring(0, 100)}`);
             return res.status(400).json({ success: false, message: 'Could not extract valid JSON from response payload. Ensure it contains JSON with bot details.' });
         }
         
-        // Extract bot details from response - be flexible with field names
-        let gc = botInfo.gc || botInfo.GC || botInfo.groupCode || botInfo.group_code;
-        let name = botInfo.name || botInfo.NAME || botInfo.botName || botInfo.bot_name;
-        let ui = botInfo.ui || botInfo.UI || botInfo.userId || botInfo.user_id || '';
-        let key = botInfo.key || botInfo.KEY || botInfo.apiKey || botInfo.api_key || '';
-        let ep = botInfo.ep || botInfo.EP || botInfo.endpoint || botInfo.end_point || '';
+        Logger.info(`[IMPORT_BOT_V2] Extracted bot info: ${JSON.stringify(botInfo)}`);
+        
+        // Recursively search for bot fields in nested objects
+        const findField = (obj, fieldNames) => {
+            if (!obj || typeof obj !== 'object') return null;
+            
+            for (const field of fieldNames) {
+                if (obj[field] !== undefined && obj[field] !== null) return obj[field];
+            }
+            
+            for (const key in obj) {
+                const val = findField(obj[key], fieldNames);
+                if (val !== null) return val;
+            }
+            
+            return null;
+        };
+        
+        // Extract bot details from response - search recursively
+        let gc = findField(botInfo, ['gc', 'GC', 'groupCode', 'group_code', 'gid', 'GID']);
+        let name = findField(botInfo, ['name', 'NAME', 'botName', 'bot_name', 'NM']);
+        let ui = findField(botInfo, ['ui', 'UI', 'userId', 'user_id', 'uid', 'UID']) || '';
+        let key = findField(botInfo, ['key', 'KEY', 'apiKey', 'api_key', 'KEY']) || '';
+        let ep = findField(botInfo, ['ep', 'EP', 'endpoint', 'end_point', 'EP']) || '';
         
         if (!gc || !name) {
-            return res.status(400).json({ success: false, message: 'Response payload must contain gc/groupCode and name/botName fields' });
+            Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc=${gc}, name=${name}`);
+            return res.status(400).json({ success: false, message: 'Response payload must contain gc and name fields. Extracted: ' + JSON.stringify({ gc, name }) });
         }
         
         // Create bot object
@@ -1614,6 +1654,8 @@ app.post('/api/bots/import-v2', async (req, res) => {
             ui: String(ui).trim(),
             name: String(name).trim()
         };
+        
+        Logger.info(`[IMPORT_BOT_V2] Created bot object: ${JSON.stringify(newBot)}`);
         
         // Load existing bots
         let bots = await FileManager.loadBots();
