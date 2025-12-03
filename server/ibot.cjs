@@ -1544,201 +1544,110 @@ app.post('/api/bots/:botId/leave', (req, res) => {
     }
 });
 
-// Import bot v2 - using request/response payloads and token
+// Helper function to extract JSON from text (handles HTTP headers)
+function extractJSON(text) {
+    const trimmed = text.trim();
+    const jsonStart = trimmed.indexOf('{');
+    if (jsonStart === -1) {
+        throw new Error('No JSON object found in text');
+    }
+    return JSON.parse(trimmed.substring(jsonStart));
+}
+
+// Import bot v2 - using request/response payloads and token (same as reference script)
 app.post('/api/bots/import-v2', async (req, res) => {
     try {
         const { requestPayload, responsePayload, token } = req.body;
         
         if (!requestPayload || !responsePayload || !token) {
-            return res.status(400).json({ success: false, message: 'Missing required fields: requestPayload, responsePayload, token' });
+            return res.json({ success: false, message: 'Missing request payload, response payload, or token' });
         }
-        
-        // Helper function to decode frame (same as in BotConnection)
-        const decodeFrame = (frame) => {
-            try {
-                // Try to decode as base64
-                const jsonString = Buffer.from(frame, 'base64').toString('utf-8');
-                return JSON.parse(jsonString);
-            } catch (error) {
-                try {
-                    // If base64 fails, try direct JSON parse
-                    return JSON.parse(frame);
-                } catch (e) {
-                    return null;
-                }
-            }
-        };
-        
-        // Helper function to extract JSON from text with random content
-        const extractJSON = (text) => {
-            if (typeof text !== 'string') return null;
-            
-            // Try decoding as base64 first
-            const decoded = decodeFrame(text);
-            if (decoded && typeof decoded === 'object') return decoded;
-            
-            // Try direct parse
-            try {
-                return JSON.parse(text);
-            } catch (e) {}
-            
-            // Look for JSON objects in the text
-            const jsonMatches = text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
-            if (jsonMatches) {
-                for (const match of jsonMatches) {
-                    try {
-                        return JSON.parse(match);
-                    } catch (e) {}
-                }
-            }
-            
-            // Look for JSON arrays
-            const arrayMatches = text.match(/\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]/g);
-            if (arrayMatches) {
-                for (const match of arrayMatches) {
-                    try {
-                        const parsed = JSON.parse(match);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            return parsed[0];
-                        }
-                    } catch (e) {}
-                }
-            }
-            
-            return null;
-        };
-        
-        // Extract bot info from response payload
-        let botInfo = extractJSON(responsePayload);
-        
-        if (!botInfo) {
-            Logger.error(`[IMPORT_BOT_V2] Could not extract JSON from response payload: ${responsePayload.substring(0, 100)}`);
-            return res.status(400).json({ success: false, message: 'Could not extract valid JSON from response payload. Ensure it contains JSON with bot details.' });
-        }
-        
-        Logger.info(`[IMPORT_BOT_V2] Full botInfo payload: ${JSON.stringify(botInfo).substring(0, 500)}`);
-        Logger.info(`[IMPORT_BOT_V2] Root keys: ${Object.keys(botInfo).join(', ')}`);
-        
-        // Extremely aggressive deep search - searches ENTIRE structure
-        const getAllValues = (obj, depth = 0, results = {}) => {
-            if (depth > 30 || !obj || typeof obj !== 'object') return results;
-            
-            for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                    const val = obj[key];
-                    results[key] = val;
-                    
-                    if (val && typeof val === 'object') {
-                        Object.assign(results, getAllValues(val, depth + 1, results));
-                    }
-                }
-            }
-            return results;
-        };
-        
-        const allValues = getAllValues(botInfo);
-        Logger.info(`[IMPORT_BOT_V2] All available keys found: ${Object.keys(allValues).slice(0, 20).join(', ')}`);
-        
-        // Search for bot fields - check all extracted values
-        const fieldSets = {
-            gc: ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID'],
-            name: ['NM', 'name', 'NAME', 'botName', 'bot_name'],
-            ui: ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID'],
-            key: ['KEY', 'key', 'apiKey', 'api_key'],
-            ep: ['EP', 'ep', 'endpoint', 'end_point']
-        };
-        
-        let gc = null, name = null, ui = '', key = '', ep = '';
-        
-        // Try to find each field in all values
-        for (const field of fieldSets.gc) {
-            if (allValues[field]) {
-                gc = allValues[field];
-                Logger.info(`[IMPORT_BOT_V2] Found GC field '${field}' = ${String(gc).substring(0, 50)}`);
-                break;
-            }
-        }
-        
-        for (const field of fieldSets.name) {
-            if (allValues[field]) {
-                name = allValues[field];
-                Logger.info(`[IMPORT_BOT_V2] Found NM field '${field}' = ${String(name).substring(0, 50)}`);
-                break;
-            }
-        }
-        
-        for (const field of fieldSets.ui) {
-            if (allValues[field]) {
-                ui = allValues[field];
-                Logger.info(`[IMPORT_BOT_V2] Found UI field '${field}' = ${String(ui).substring(0, 50)}`);
-                break;
-            }
-        }
-        
-        for (const field of fieldSets.key) {
-            if (allValues[field]) {
-                key = allValues[field];
-                Logger.info(`[IMPORT_BOT_V2] Found KEY field '${field}' = ${String(key).substring(0, 20)}`);
-                break;
-            }
-        }
-        
-        for (const field of fieldSets.ep) {
-            if (allValues[field]) {
-                ep = allValues[field];
-                Logger.info(`[IMPORT_BOT_V2] Found EP field '${field}' = ${String(ep).substring(0, 20)}`);
-                break;
-            }
-        }
-        
-        Logger.info(`[IMPORT_BOT_V2] Final extracted fields: gc="${gc}", name="${name}"`);
-        
-        if (!gc || !name) {
-            Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc="${gc}", name="${name}"`);
-            Logger.error(`[IMPORT_BOT_V2] All keys in payload: ${Object.keys(allValues).join(', ')}`);
-            return res.status(400).json({ success: false, message: `GC or NM field not found in payload. Searched for: ${fieldSets.gc.concat(fieldSets.name).join(', ')}. Available keys: ${Object.keys(allValues).slice(0, 30).join(', ')}` });
-        }
-        
-        // Create bot object
-        const newBot = {
-            key: String(key).trim(),
-            ep: String(ep).trim(),
-            gc: String(gc).trim(),
-            ui: String(ui).trim(),
-            name: String(name).trim()
-        };
-        
-        Logger.info(`[IMPORT_BOT_V2] Created bot object: ${JSON.stringify(newBot)}`);
-        
-        // Load existing bots
-        let bots = await FileManager.loadBots();
-        
-        // Check for duplicate
-        if (bots.some(bot => bot.gc === newBot.gc)) {
-            return res.status(400).json({ success: false, message: `Bot with gc '${newBot.gc}' already exists` });
-        }
-        
-        // Add new bot
-        bots.push(newBot);
-        
-        // Save to both locations
-        await FileManager.saveBots(bots);
-        Logger.info(`[IMPORT_BOT_V2] Added bot: ${newBot.name} (${newBot.gc})`);
-        
-        // Sync to root fukrey.json
-        const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
+
         try {
-            await fs.writeFile(rootFukreyPath, JSON.stringify(bots, null, 2));
-            Logger.info(`[IMPORT_BOT_V2] Synced to root fukrey.json`);
-        } catch (syncError) {
-            Logger.warn(`Could not sync to root fukrey.json: ${syncError.message}`);
+            // Extract and parse request payload (handles HTTP headers)
+            const reqData = extractJSON(requestPayload);
+            const at = reqData.AT;
+            if (!at) {
+                return res.json({ success: false, message: 'Could not find AT (Access Token) in request payload' });
+            }
+
+            // Extract and parse response payload (handles HTTP headers)
+            const respData = extractJSON(responsePayload);
+            const ui = respData.UI;
+            const dd = respData.DD;
+            const snuid = respData.PY?.AV; // This is the unique ID, not GC
+            // Try multiple locations for GC (Player ID)
+            const gc = respData.GC || respData.PY?.GC || respData.PI?.GC;
+            const name = respData.PY?.name || respData.name || respData.PI?.NM || respData.PY?.NM;
+
+            if (!ui || !dd || !snuid || !gc || !name) {
+                return res.json({ 
+                    success: false, 
+                    message: `Missing required fields. Found: UI=${ui}, DD=${dd}, snuid=${snuid}, GC=${gc}, name=${name}` 
+                });
+            }
+
+            // Decode token to extract KEY and EP
+            const tokenData = JSON.parse(Buffer.from(token.trim(), 'base64').toString('utf-8'));
+            const pyData = typeof tokenData.PY === 'string' 
+                ? JSON.parse(tokenData.PY) 
+                : tokenData.PY;
+            const key = pyData.KEY;
+            const ep = pyData.EP;
+
+            if (!key || !ep) {
+                return res.json({ success: false, message: 'Could not extract KEY or EP from token' });
+            }
+
+            // Check if bot already exists
+            const existingBots = await FileManager.loadBots();
+            const botExists = existingBots.some(b => b.gc === gc);
+
+            if (botExists) {
+                return res.json({ success: false, message: `Bot with GC ${gc} already exists` });
+            }
+
+            // Create bot object with all properties
+            const newBot = {
+                name,
+                key,
+                ep,
+                gc, // Player ID
+                ui,
+                dd, // Device ID
+                at, // Access Token
+                snuid // Unique ID from response
+            };
+
+            // Add to file
+            existingBots.push(newBot);
+            await FileManager.saveBots(existingBots);
+            
+            // Sync to root fukrey.json
+            const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
+            try {
+                await fs.writeFile(rootFukreyPath, JSON.stringify(existingBots, null, 2));
+                Logger.info(`[IMPORT_BOT_V2] Synced to root fukrey.json`);
+            } catch (syncError) {
+                Logger.warn(`Could not sync to root fukrey.json: ${syncError.message}`);
+            }
+            
+            // Reload bots in connection manager
+            await connectionManager.reloadBots();
+
+            Logger.success(`Imported bot v2: ${newBot.name} (${gc})`);
+            res.json({ 
+                success: true, 
+                message: `Successfully imported bot: ${name}`,
+                bot: { name, gc, ui, dd }
+            });
+        } catch (parseError) {
+            Logger.error(`Failed to parse payloads: ${parseError.message}`);
+            return res.json({ 
+                success: false, 
+                message: `Failed to parse payloads: ${parseError.message}` 
+            });
         }
-        
-        // Reload bots in memory
-        await connectionManager.reloadBots();
-        Logger.info(`[IMPORT_BOT_V2] Reloaded bot registry`);
-        
-        res.json({ success: true, message: 'Bot imported successfully', bot: newBot, totalBots: bots.length });
     } catch (error) {
         Logger.error(`Import bot v2 error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
