@@ -1616,16 +1616,20 @@ app.post('/api/bots/import-v2', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Could not extract valid JSON from response payload. Ensure it contains JSON with bot details.' });
         }
         
-        Logger.info(`[IMPORT_BOT_V2] Extracted bot info: ${JSON.stringify(botInfo)}`);
+        Logger.info(`[IMPORT_BOT_V2] Extracted bot info keys: ${Object.keys(botInfo).join(', ')}`);
+        
+        // Try to extract from PY object first (most common structure)
+        let pyData = botInfo.PY || botInfo;
+        Logger.info(`[IMPORT_BOT_V2] Using data source: ${botInfo.PY ? 'PY object' : 'root object'}`);
         
         // Deep recursive search that logs what it finds
         const findField = (obj, fieldNames, depth = 0) => {
             if (depth > 20) return null; // Prevent infinite recursion
             if (!obj || typeof obj !== 'object') return null;
             
-            // Check direct properties first
+            // Check direct properties first (case-sensitive)
             for (const field of fieldNames) {
-                if (obj[field] !== undefined && obj[field] !== null) {
+                if (obj.hasOwnProperty(field) && obj[field] !== undefined && obj[field] !== null) {
                     Logger.info(`[IMPORT_BOT_V2] Found field '${field}' = ${JSON.stringify(obj[field]).substring(0, 100)}`);
                     return obj[field];
                 }
@@ -1633,31 +1637,33 @@ app.post('/api/bots/import-v2', async (req, res) => {
             
             // Check all nested values
             for (const key in obj) {
-                const value = obj[key];
-                if (value && typeof value === 'object') {
-                    const result = findField(value, fieldNames, depth + 1);
-                    if (result !== null) return result;
+                if (obj.hasOwnProperty(key)) {
+                    const value = obj[key];
+                    if (value && typeof value === 'object') {
+                        const result = findField(value, fieldNames, depth + 1);
+                        if (result !== null) return result;
+                    }
                 }
             }
             
             return null;
         };
         
-        Logger.info(`[IMPORT_BOT_V2] Starting field extraction from botInfo: ${JSON.stringify(botInfo).substring(0, 200)}`);
+        Logger.info(`[IMPORT_BOT_V2] PY object keys: ${Object.keys(pyData).join(', ')}`);
         
-        // Extract bot details from response - search recursively
-        let gc = findField(botInfo, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
-        let name = findField(botInfo, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
-        let ui = findField(botInfo, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
-        let key = findField(botInfo, ['KEY', 'key', 'apiKey', 'api_key']) || '';
-        let ep = findField(botInfo, ['EP', 'ep', 'endpoint', 'end_point']) || '';
+        // Extract bot details from response - search starting from PY
+        let gc = pyData.GC || findField(pyData, ['GC', 'gc', 'groupCode', 'group_code', 'gid', 'GID']);
+        let name = pyData.NM || findField(pyData, ['NM', 'name', 'NAME', 'botName', 'bot_name']);
+        let ui = pyData.UI || findField(pyData, ['UI', 'ui', 'userId', 'user_id', 'uid', 'UID']) || '';
+        let key = pyData.KEY || findField(pyData, ['KEY', 'key', 'apiKey', 'api_key']) || '';
+        let ep = pyData.EP || findField(pyData, ['EP', 'ep', 'endpoint', 'end_point']) || '';
         
-        Logger.info(`[IMPORT_BOT_V2] Extracted fields: gc=${gc}, name=${name}, ui=${ui}, key=${key}, ep=${ep}`);
+        Logger.info(`[IMPORT_BOT_V2] Extracted fields: gc="${gc}", name="${name}", ui="${ui}", key="${String(key).substring(0, 20)}", ep="${String(ep).substring(0, 20)}"`);
         
         if (!gc || !name) {
-            Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc=${gc}, name=${name}`);
-            Logger.error(`[IMPORT_BOT_V2] Full botInfo structure: ${JSON.stringify(botInfo)}`);
-            return res.status(400).json({ success: false, message: `Response payload must contain gc and name fields. Extracted: gc=${gc}, name=${name}. Full structure: ${JSON.stringify(botInfo).substring(0, 500)}` });
+            Logger.error(`[IMPORT_BOT_V2] Missing required fields. gc="${gc}", name="${name}"`);
+            Logger.error(`[IMPORT_BOT_V2] Available top-level keys in PY: ${Object.keys(pyData).join(', ')}`);
+            return res.status(400).json({ success: false, message: `Missing fields: gc="${gc}", name="${name}". Available keys: ${Object.keys(pyData).join(', ')}` });
         }
         
         // Create bot object
