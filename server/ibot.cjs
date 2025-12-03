@@ -1625,6 +1625,10 @@ app.delete('/api/bots/:botId', async (req, res) => {
             Logger.warn(`Could not sync deletion to root fukrey.json: ${syncError.message}`);
         }
         
+        // Reload bots in memory to reflect deletion
+        await connectionManager.reloadBots();
+        Logger.info(`[DELETE_BOT] Reloaded bot registry after deletion`);
+        
         res.json({ success: true, message: 'Bot deleted successfully', totalBots: bots.length });
     } catch (error) {
         Logger.error(`Delete bot error: ${error.message}`);
