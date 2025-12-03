@@ -1544,6 +1544,74 @@ app.post('/api/bots/:botId/leave', (req, res) => {
     }
 });
 
+// Import bot v2 - using request/response payloads and token
+app.post('/api/bots/import-v2', async (req, res) => {
+    try {
+        const { requestPayload, responsePayload, token } = req.body;
+        
+        if (!requestPayload || !responsePayload || !token) {
+            return res.status(400).json({ success: false, message: 'Missing required fields: requestPayload, responsePayload, token' });
+        }
+        
+        // Parse response payload (should be JSON with bot details)
+        let botInfo;
+        try {
+            botInfo = typeof responsePayload === 'string' ? JSON.parse(responsePayload) : responsePayload;
+        } catch (e) {
+            return res.status(400).json({ success: false, message: 'Invalid response payload JSON format' });
+        }
+        
+        // Extract bot details from response
+        const { gc, name, ui, key, ep } = botInfo;
+        
+        if (!gc || !name) {
+            return res.status(400).json({ success: false, message: 'Response payload must contain gc and name fields' });
+        }
+        
+        // Create bot object
+        const newBot = {
+            key: key || '',
+            ep: ep || '',
+            gc: gc.trim(),
+            ui: ui || '',
+            name: name.trim()
+        };
+        
+        // Load existing bots
+        let bots = await FileManager.loadBots();
+        
+        // Check for duplicate
+        if (bots.some(bot => bot.gc === newBot.gc)) {
+            return res.status(400).json({ success: false, message: `Bot with gc '${newBot.gc}' already exists` });
+        }
+        
+        // Add new bot
+        bots.push(newBot);
+        
+        // Save to both locations
+        await FileManager.saveBots(bots);
+        Logger.info(`[IMPORT_BOT_V2] Added bot: ${newBot.name} (${newBot.gc})`);
+        
+        // Sync to root fukrey.json
+        const rootFukreyPath = path.join(path.dirname(__dirname), 'fukrey.json');
+        try {
+            await fs.writeFile(rootFukreyPath, JSON.stringify(bots, null, 2));
+            Logger.info(`[IMPORT_BOT_V2] Synced to root fukrey.json`);
+        } catch (syncError) {
+            Logger.warn(`Could not sync to root fukrey.json: ${syncError.message}`);
+        }
+        
+        // Reload bots in memory
+        await connectionManager.reloadBots();
+        Logger.info(`[IMPORT_BOT_V2] Reloaded bot registry`);
+        
+        res.json({ success: true, message: 'Bot imported successfully', bot: newBot, totalBots: bots.length });
+    } catch (error) {
+        Logger.error(`Import bot v2 error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Bulk connect
 app.post('/api/bots/bulk/connect', async (req, res) => {
     try {
