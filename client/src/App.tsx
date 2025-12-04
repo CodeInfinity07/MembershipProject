@@ -12,6 +12,7 @@ import LoaderPage from "@/pages/loader";
 import MembershipPage from "@/pages/membership";
 import NotFound from "@/pages/not-found";
 import BotManagementPage from "@/pages/botManagementPage";
+import UnavailablePage from "@/pages/unavailable";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/name-change" component={NameChangePage} />
       <Route path="/loader" component={LoaderPage} />
       <Route path="/membership" component={MembershipPage} />
+      <Route path="/unavailable" component={UnavailablePage} />
       <Route component={NotFound} />
     </Switch>
   );
