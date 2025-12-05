@@ -772,6 +772,13 @@ const TaskState = {
         failed: 0,
         active: new Map(),
         completedBots: new Set()
+    },
+    nameChange: {
+        isRunning: false,
+        total: 0,
+        completed: 0,
+        failed: 0,
+        results: []
     }
 };
 
@@ -1212,6 +1219,133 @@ const MicTask = {
         TaskState.mic.isRunning = false;
         TaskState.mic.active.clear();
         Logger.info('Mic task stopped');
+    }
+};
+
+// ==================== NAME CHANGE TASK ====================
+const NameChangeTask = {
+    async sendNameToBot(botId, assignedName) {
+        const connection = connectionManager.getConnection(botId);
+        if (!connection) {
+            return { success: false, error: 'Bot not connected' };
+        }
+
+        try {
+            const nameSuccess = connection.sendNameChangeMessage(assignedName);
+            if (!nameSuccess) {
+                return { success: false, error: 'Failed to send name message' };
+            }
+
+            await Utils.delay(100);
+
+            const avSuccess = connection.sendAVMessage();
+            if (!avSuccess) {
+                return { success: false, error: 'Failed to send AV message' };
+            }
+
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    async run(names) {
+        if (TaskState.nameChange.isRunning) {
+            return { success: false, message: 'Name change task already running' };
+        }
+
+        TaskState.nameChange.isRunning = true;
+        TaskState.nameChange.total = 0;
+        TaskState.nameChange.completed = 0;
+        TaskState.nameChange.failed = 0;
+        TaskState.nameChange.results = [];
+
+        const connectedBots = connectionManager.getAllConnectedBots();
+        
+        if (connectedBots.length === 0) {
+            Logger.error('No connected bots available for name change');
+            TaskState.nameChange.isRunning = false;
+            return { success: false, message: 'No connected bots available' };
+        }
+
+        TaskState.nameChange.total = connectedBots.length;
+        Logger.info(`Starting name change task for ${connectedBots.length} bots with ${names.length} names`);
+
+        const successfulUpdates = [];
+
+        for (let i = 0; i < connectedBots.length; i++) {
+            if (!TaskState.nameChange.isRunning) break;
+
+            const botId = connectedBots[i];
+            const connection = connectionManager.getConnection(botId);
+            
+            const assignedName = names[i % names.length];
+
+            Logger.info(`Assigning name "${assignedName}" to bot ${i + 1}/${connectedBots.length}`);
+
+            const result = await this.sendNameToBot(botId, assignedName);
+            
+            if (result.success) {
+                TaskState.nameChange.completed++;
+                TaskState.nameChange.results.push({
+                    botId,
+                    botName: connection?.bot.name || botId,
+                    success: true,
+                    assignedName
+                });
+                
+                if (connection && connection.bot) {
+                    connection.bot.name = assignedName;
+                }
+                
+                successfulUpdates.push({ botId, gc: connection?.bot.gc, newName: assignedName });
+                Logger.success(`Bot ${botId}: Name changed to "${assignedName}"`);
+            } else {
+                TaskState.nameChange.failed++;
+                TaskState.nameChange.results.push({
+                    botId,
+                    botName: connection?.bot.name || botId,
+                    success: false,
+                    assignedName,
+                    error: result.error
+                });
+                Logger.warn(`Bot ${botId}: Failed to change name - ${result.error}`);
+            }
+
+            await Utils.delay(150);
+        }
+
+        if (successfulUpdates.length > 0) {
+            try {
+                const allBots = await FileManager.loadBots();
+                const updatedBots = allBots.map(bot => {
+                    const update = successfulUpdates.find(u => u.gc === bot.gc);
+                    if (update) {
+                        return { ...bot, name: update.newName };
+                    }
+                    return bot;
+                });
+                await FileManager.saveBots(updatedBots);
+                Logger.success(`Updated ${successfulUpdates.length} bot names in fukrey.json`);
+            } catch (error) {
+                Logger.error(`Failed to save updated bot names: ${error.message}`);
+            }
+        }
+
+        Logger.success(`Name change task completed: ${TaskState.nameChange.completed} succeeded, ${TaskState.nameChange.failed} failed`);
+        TaskState.nameChange.isRunning = false;
+
+        return { success: true };
+    },
+
+    async stop() {
+        if (!TaskState.nameChange.isRunning) {
+            Logger.info('Name change task was not running');
+            return;
+        }
+
+        TaskState.nameChange.isRunning = false;
+        Logger.success('Name change task stopped');
     }
 };
 
@@ -1676,6 +1810,43 @@ app.post('/api/bots/import-v2', async (req, res) => {
         Logger.error(`Import bot v2 error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+// Name Change task endpoints
+app.get('/api/name-change/status', (req, res) => {
+    const stats = connectionManager.getStats();
+    const nameChangeStatus = {
+        ...TaskState.nameChange,
+        connectedBots: stats.connected,
+        totalBots: stats.totalBots
+    };
+    res.json({ success: true, nameChangeStatus });
+});
+
+app.post('/api/name-change/start', async (req, res) => {
+    try {
+        const { names } = req.body;
+        
+        if (!names || !Array.isArray(names) || names.length === 0) {
+            return res.json({ success: false, message: 'Please provide at least one name' });
+        }
+
+        const stats = connectionManager.getStats();
+        if (stats.connected === 0) {
+            return res.json({ success: false, message: 'No connected bots available' });
+        }
+
+        res.json({ success: true, message: `Starting name change for ${stats.connected} bots` });
+        NameChangeTask.run(names);
+    } catch (error) {
+        Logger.error(`Name change start error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+app.post('/api/name-change/stop', async (req, res) => {
+    await NameChangeTask.stop();
+    res.json({ success: true, message: 'Name change task stopped' });
 });
 
 // Bulk connect
