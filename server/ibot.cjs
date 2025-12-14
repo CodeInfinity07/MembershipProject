@@ -382,6 +382,20 @@ class BotConnection extends EventEmitter {
 
             this.emit('membershipChecked', membershipData);
         } else {
+            Logger.info(`Bot ${this.bot.name} is non-member, sending membership request...`);
+            
+            const message = JSON.stringify({
+                RH: "CBC",
+                PU: "CMS",
+                PY: JSON.stringify({
+                    CID: `${this.currentClubCode}`
+                })
+            });
+            
+            if (Utils.sendMessage(this.ws, message)) {
+                Logger.info(`Membership request sent for ${this.bot.name}`);
+            }
+            
             this.emit('membershipChecked', {
                 membership: false,
                 message: false,
