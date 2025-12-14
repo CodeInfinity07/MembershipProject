@@ -42,7 +42,7 @@ interface AuthPrompt {
 
 export default function BotManagementPage() {
   const { toast } = useToast();
-  const [clubCode, setClubCode] = useState("2341357");
+  const [clubCode, setClubCode] = useState("6684622");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "connected" | "disconnected" | "inClub">("all");
   const [filterSource, setFilterSource] = useState<"all" | "main" | "loader">("all");

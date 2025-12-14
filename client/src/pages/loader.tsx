@@ -46,7 +46,7 @@ interface LoaderStatusResponse {
 
 export default function LoaderPage() {
   const { toast } = useToast();
-  const [clubCode, setClubCode] = useState("2341357");
+  const [clubCode, setClubCode] = useState("6684622");
   const [botCount, setBotCount] = useState("");
   
   // Fetch loader status
