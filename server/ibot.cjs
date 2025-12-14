@@ -2257,7 +2257,7 @@ app.post('/api/loader/connect', async (req, res) => {
 
 app.post('/api/loader/join', async (req, res) => {
     try {
-        const { clubCode } = req.body;
+        const { clubCode, botCount } = req.body;
         const targetClubCode = clubCode || CONFIG.CLUB_CODE;
         
         const connectedBots = connectionManager.getAllConnectedBots();
@@ -2266,10 +2266,20 @@ app.post('/api/loader/join', async (req, res) => {
             return res.json({ success: false, message: 'No connected bots. Connect bots first from the Connect Bots page.' });
         }
         
-        let joinedCount = 0;
-        for (const botId of connectedBots) {
+        // Filter bots that are not already in a club
+        const availableBots = connectedBots.filter(botId => {
             const connection = connectionManager.getConnection(botId);
-            if (connection && !connection.isInClub) {
+            return connection && !connection.isInClub;
+        });
+        
+        // Determine how many bots to join
+        const maxBots = botCount && botCount > 0 ? Math.min(botCount, availableBots.length) : availableBots.length;
+        const botsToJoin = availableBots.slice(0, maxBots);
+        
+        let joinedCount = 0;
+        for (const botId of botsToJoin) {
+            const connection = connectionManager.getConnection(botId);
+            if (connection) {
                 connection.joinClub(targetClubCode);
                 joinedCount++;
             }

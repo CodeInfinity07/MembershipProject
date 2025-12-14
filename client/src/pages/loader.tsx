@@ -31,6 +31,7 @@ interface StatsResponse {
 export default function LoaderPage() {
   const { toast } = useToast();
   const [clubCode, setClubCode] = useState("6684622");
+  const [botCount, setBotCount] = useState("");
   
   // Fetch connected bots from bot management
   const { data, isLoading, error } = useQuery<StatsResponse>({
@@ -38,10 +39,14 @@ export default function LoaderPage() {
     refetchInterval: 2000,
   });
 
-  // Join mutation - joins all connected bots to the specified club
+  // Join mutation - joins specified number of connected bots to the club
   const joinMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/loader/join', { clubCode });
+      const payload: { clubCode: string; botCount?: number } = { clubCode };
+      if (botCount.trim()) {
+        payload.botCount = parseInt(botCount);
+      }
+      const response = await apiRequest('POST', '/api/loader/join', payload);
       const result = await response.json();
       if (!result.success) {
         throw new Error(result.message);
@@ -136,6 +141,23 @@ export default function LoaderPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="botCount" className="text-xs text-muted-foreground uppercase">
+                Number of Bots (leave empty for all)
+              </Label>
+              <Input
+                id="botCount"
+                type="number"
+                value={botCount}
+                onChange={(e) => setBotCount(e.target.value)}
+                placeholder={`Max: ${connectedBots.length}`}
+                min="1"
+                max={connectedBots.length}
+                className="font-mono"
+                data-testid="input-bot-count"
+              />
+            </div>
+
             <div className="rounded-md bg-muted p-3">
               <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                 Status
@@ -154,7 +176,7 @@ export default function LoaderPage() {
                 data-testid="button-join"
               >
                 <LogIn className="h-4 w-4 mr-2" />
-                {joinMutation.isPending ? "Joining..." : `Join Club (${connectedBots.length} bots)`}
+                {joinMutation.isPending ? "Joining..." : `Join Club (${botCount.trim() ? Math.min(parseInt(botCount) || 0, connectedBots.length) : connectedBots.length} bots)`}
               </Button>
 
               <Button
