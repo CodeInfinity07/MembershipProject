@@ -15,8 +15,8 @@ localPort = 443
 externalPort = 3002
 
 [[ports]]
-localPort = 3003
-externalPort = 3003
+localPort = 4003
+externalPort = 4003
 
 [[ports]]
 localPort = 5000

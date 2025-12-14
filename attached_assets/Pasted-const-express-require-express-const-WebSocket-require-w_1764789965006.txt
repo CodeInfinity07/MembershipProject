@@ -9,7 +9,7 @@ const { EventEmitter } = require('events');
 // ==================== CONFIGURATION ====================
 const CONFIG = {
     PORT: 3091,
-    CLUB_CODE: 2341357,
+    CLUB_CODE: 6684622,
     BOTS_FILE: './fukrey.json',
     MEMBERS_FILE: './member_users.json',
     MAX_CONNECTIONS: 500,

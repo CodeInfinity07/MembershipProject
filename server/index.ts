@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5005;
-const BOT_SERVER_PORT = 3003;
+const BOT_SERVER_PORT = 4007;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
