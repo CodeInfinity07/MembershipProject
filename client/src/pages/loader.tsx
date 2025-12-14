@@ -3,147 +3,89 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Link as LinkIcon, LogIn, LogOut } from "lucide-react";
+import { User, LogIn, LogOut } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Bot } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
-interface LoaderBot extends Omit<Bot, 'name'> {
-  connecting?: boolean;
-  connected?: boolean;
-  joining?: boolean;
-  joined?: boolean;
-  failed?: boolean;
-  gc?: string;
-  name?: string;
-  ui?: string;
-  ep?: string;
-  key?: string;
-  connectionId?: string;
-  error?: string | null;
+interface BotStatus {
+  botId: string;
+  name: string;
+  gc: string;
+  source: string;
+  connected: boolean;
+  inClub: boolean;
+  membership?: boolean;
 }
 
-interface LoaderStatus {
-  isRunning: boolean;
-  isConnecting: boolean;
-  isJoining: boolean;
-  totalBots: number;
-  availableBots: number;
-  connected: number;
-  joined: number;
-  failed: number;
-  clubCode: string;
-  bots: LoaderBot[];
-  sourceFile: string;
-  activeConnections: any[];
-}
-
-interface LoaderStatusResponse {
+interface StatsResponse {
   success: boolean;
-  loaderStatus: LoaderStatus;
+  stats: {
+    totalBots: number;
+    connected: number;
+    inClub: number;
+  };
+  bots: BotStatus[];
 }
 
 export default function LoaderPage() {
   const { toast } = useToast();
   const [clubCode, setClubCode] = useState("6684622");
-  const [botCount, setBotCount] = useState("");
   
-  // Fetch loader status
-  const { data, isLoading, error } = useQuery<LoaderStatusResponse>({
-    queryKey: ['/api/loader/status'],
+  // Fetch connected bots from bot management
+  const { data, isLoading, error } = useQuery<StatsResponse>({
+    queryKey: ['/api/bots'],
     refetchInterval: 2000,
   });
 
-  // Connect mutation
-  const connectMutation = useMutation({
-    mutationFn: () => {
-      const payload: any = { clubCode };
-      if (botCount.trim()) {
-        payload.botCount = parseInt(botCount);
+  // Join mutation - joins all connected bots to the specified club
+  const joinMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/loader/join', { clubCode });
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message);
       }
-      return apiRequest('POST', '/api/loader/connect', payload);
+      return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/loader/status'] });
-      toast({ title: "Bots connecting" });
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
+      toast({ title: "Joining club", description: data.message });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to connect bots", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      toast({ title: "Failed to join club", description: error.message, variant: "destructive" });
     },
   });
 
-  // Join mutation
-  const joinMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/loader/join'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/loader/status'] });
-      toast({ title: "Joining club" });
-    },
-    onError: () => {
-      toast({ title: "Failed to join club", variant: "destructive" });
-    },
-  });
-
-  // Stop mutation
+  // Leave/Stop mutation
   const stopMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/loader/stop'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/loader/status'] });
-      toast({ title: "Loader stopped" });
+      queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
+      toast({ title: "Left club and disconnected" });
     },
     onError: () => {
-      toast({ title: "Failed to stop loader", variant: "destructive" });
+      toast({ title: "Failed to stop", variant: "destructive" });
     },
   });
 
-  // Extract status with safe defaults
-  const status = data?.loaderStatus || {
-    isRunning: false,
-    isConnecting: false,
-    isJoining: false,
-    totalBots: 0,
-    availableBots: 0,
-    connected: 0,
-    joined: 0,
-    failed: 0,
-    clubCode: '',
-    bots: [],
-    sourceFile: '',
-    activeConnections: []
-  };
-
-  const {
-    isRunning,
-    isConnecting,
-    isJoining,
-    totalBots,
-    availableBots,
-    connected,
-    joined,
-    failed,
-    bots
-  } = status;
-
-  // Determine status text
-  let statusText = 'Idle';
-  if (isConnecting) statusText = 'Connecting';
-  else if (isJoining) statusText = 'Joining Club';
-  else if (isRunning) statusText = 'Running';
-
-  // Join button logic
-  const canJoin = isRunning && !isJoining && connected > 0 && connected === totalBots;
+  const stats = data?.stats || { totalBots: 0, connected: 0, inClub: 0 };
+  const bots = data?.bots || [];
+  
+  // Filter to only show connected bots
+  const connectedBots = bots.filter(bot => bot.connected);
+  const inClubBots = bots.filter(bot => bot.inClub);
+  
+  // Can join if there are connected bots and club code is set
+  const canJoin = connectedBots.length > 0 && clubCode.trim().length > 0;
+  const hasBotsInClub = inClubBots.length > 0;
 
   // Show loading state
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Bot Loader</h1>
+          <h1 className="text-2xl font-bold mb-2">Loader</h1>
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -155,7 +97,7 @@ export default function LoaderPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Bot Loader</h1>
+          <h1 className="text-2xl font-bold mb-2">Loader</h1>
           <p className="text-destructive">Error loading status: {error.message}</p>
         </div>
       </div>
@@ -165,8 +107,8 @@ export default function LoaderPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mb-2">Bot Loader</h1>
-        <p className="text-muted-foreground">Connect bots to groups</p>
+        <h1 className="text-2xl font-bold mb-2">Loader</h1>
+        <p className="text-muted-foreground">Join connected bots to a club</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -191,24 +133,6 @@ export default function LoaderPage() {
                 placeholder="Enter club code..."
                 className="font-mono"
                 data-testid="input-club-code"
-                disabled={isRunning}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="botCount" className="text-xs text-muted-foreground uppercase">
-                Number of Bots (leave empty for all)
-              </Label>
-              <Input
-                id="botCount"
-                type="number"
-                value={botCount}
-                onChange={(e) => setBotCount(e.target.value)}
-                placeholder="e.g., 50"
-                min="1"
-                className="font-mono"
-                data-testid="input-bot-count"
-                disabled={isRunning}
               />
             </div>
 
@@ -217,22 +141,11 @@ export default function LoaderPage() {
                 Status
               </div>
               <div className="font-semibold font-mono" data-testid="text-loader-status">
-                {statusText}
+                {hasBotsInClub ? `${inClubBots.length} bots in club` : connectedBots.length > 0 ? `${connectedBots.length} bots ready` : 'No connected bots'}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Button
-                onClick={() => connectMutation.mutate()}
-                disabled={isRunning || connectMutation.isPending || !clubCode.trim()}
-                className="w-full"
-                variant="default"
-                data-testid="button-connect"
-              >
-                <LinkIcon className="h-4 w-4 mr-2" />
-                {connectMutation.isPending ? "Connecting..." : "Connect Bots"}
-              </Button>
-
               <Button
                 onClick={() => joinMutation.mutate()}
                 disabled={!canJoin || joinMutation.isPending}
@@ -241,56 +154,31 @@ export default function LoaderPage() {
                 data-testid="button-join"
               >
                 <LogIn className="h-4 w-4 mr-2" />
-                {joinMutation.isPending ? "Joining..." : "Join Club"}
+                {joinMutation.isPending ? "Joining..." : `Join Club (${connectedBots.length} bots)`}
               </Button>
 
               <Button
                 onClick={() => stopMutation.mutate()}
-                disabled={!isRunning || stopMutation.isPending}
+                disabled={!hasBotsInClub || stopMutation.isPending}
                 className="w-full"
                 variant="destructive"
                 data-testid="button-stop"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                {stopMutation.isPending ? "Stopping..." : "Stop & Leave"}
+                {stopMutation.isPending ? "Leaving..." : "Leave Club"}
               </Button>
             </div>
+
+            {connectedBots.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center p-2 bg-muted rounded-md">
+                Connect bots first from the "Connect Bots" page
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Stats Cards */}
         <div className="space-y-4">
-          {/* Progress Card - Built-in replacement */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Joined</span>
-                  <span className="font-semibold">{joined} / {Math.max(totalBots, 1)}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-success h-2 rounded-full transition-all"
-                    style={{ width: `${Math.max(totalBots, 1) > 0 ? (joined / Math.max(totalBots, 1)) * 100 : 0}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Connected</span>
-                  <span className="font-semibold">{connected} / {Math.max(totalBots, 1)}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-info h-2 rounded-full transition-all"
-                    style={{ width: `${Math.max(totalBots, 1) > 0 ? (connected / Math.max(totalBots, 1)) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base">Connection Stats</CardTitle>
@@ -302,99 +190,90 @@ export default function LoaderPage() {
                     Connected
                   </div>
                   <div className="font-semibold font-mono text-info" data-testid="text-connected">
-                    {connected}
+                    {stats.connected}
                   </div>
                 </div>
                 <div className="rounded-md bg-muted p-3">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                    Joined
+                    In Club
                   </div>
-                  <div className="font-semibold font-mono text-success" data-testid="text-joined">
-                    {joined}
+                  <div className="font-semibold font-mono text-success" data-testid="text-in-club">
+                    {stats.inClub}
                   </div>
                 </div>
                 <div className="rounded-md bg-muted p-3">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                    Total
+                    Total Bots
                   </div>
                   <div className="font-semibold font-mono" data-testid="text-total">
-                    {totalBots}
+                    {stats.totalBots}
                   </div>
                 </div>
                 <div className="rounded-md bg-muted p-3">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                    Failed
+                    Target Club
                   </div>
-                  <div className="font-semibold font-mono text-destructive" data-testid="text-failed">
-                    {failed}
+                  <div className="font-semibold font-mono" data-testid="text-target-club">
+                    {clubCode || 'Not Set'}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-md bg-muted p-3">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                  Target Club
+          {/* Progress Card */}
+          {connectedBots.length > 0 && (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">In Club</span>
+                    <span className="font-semibold">{inClubBots.length} / {connectedBots.length}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div 
+                      className="bg-success h-2 rounded-full transition-all"
+                      style={{ width: `${connectedBots.length > 0 ? (inClubBots.length / connectedBots.length) * 100 : 0}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="font-semibold font-mono" data-testid="text-target-club">
-                  {status.clubCode || 'Not Set'}
-                </div>
-              </div>
-              <div className="rounded-md bg-muted p-3">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                  Available Bots
-                </div>
-                <div className="font-semibold font-mono" data-testid="text-available-bots">
-                  {availableBots > 0 ? `${totalBots} / ${availableBots}` : availableBots}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
-      {/* Bot List - Built-in replacement */}
+      {/* Connected Bots List */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-info/20 text-info">
             <User className="h-4 w-4" />
           </div>
-          <CardTitle className="text-base">Bot Status</CardTitle>
+          <CardTitle className="text-base">Connected Bots ({connectedBots.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {bots.length === 0 ? (
+          {connectedBots.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Click 'Connect Bots' to begin
+              No connected bots. Go to "Connect Bots" page to connect bots first.
             </div>
           ) : (
-            <div className="space-y-2">
-              {bots.map((bot, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-md bg-muted">
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {connectedBots.map((bot, index) => (
+                <div key={bot.botId || index} className="flex items-center justify-between p-3 rounded-md bg-muted">
                   <div className="flex items-center gap-3">
                     <div className={`h-2 w-2 rounded-full ${
-                      bot?.joined ? 'bg-success' : 
-                      bot?.connected ? 'bg-info' : 
-                      bot?.failed ? 'bg-destructive' : 
-                      'bg-muted-foreground'
+                      bot.inClub ? 'bg-success' : 'bg-info'
                     }`} />
                     <div>
-                      <div className="font-semibold text-sm">{bot?.name || `Bot ${index + 1}`}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{bot?.gc || 'N/A'}</div>
+                      <div className="font-semibold text-sm">{bot.name || `Bot ${index + 1}`}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{bot.gc || 'N/A'}</div>
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {bot?.joined ? 'Joined' : 
-                     bot?.connected ? 'Connected' : 
-                     bot?.joining ? 'Joining...' :
-                     bot?.connecting ? 'Connecting...' :
-                     bot?.failed ? 'Failed' : 
-                     'Idle'}
+                    {bot.inClub ? 'In Club' : 'Connected'}
                   </div>
                 </div>
               ))}

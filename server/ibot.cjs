@@ -2257,16 +2257,25 @@ app.post('/api/loader/connect', async (req, res) => {
 
 app.post('/api/loader/join', async (req, res) => {
     try {
+        const { clubCode } = req.body;
+        const targetClubCode = clubCode || CONFIG.CLUB_CODE;
+        
         const connectedBots = connectionManager.getAllConnectedBots();
         
+        if (connectedBots.length === 0) {
+            return res.json({ success: false, message: 'No connected bots. Connect bots first from the Connect Bots page.' });
+        }
+        
+        let joinedCount = 0;
         for (const botId of connectedBots) {
             const connection = connectionManager.getConnection(botId);
             if (connection && !connection.isInClub) {
-                connection.joinClub(CONFIG.CLUB_CODE);
+                connection.joinClub(targetClubCode);
+                joinedCount++;
             }
         }
         
-        res.json({ success: true, message: `Joining ${connectedBots.length} bots to club` });
+        res.json({ success: true, message: `Joining ${joinedCount} bots to club ${targetClubCode}` });
     } catch (error) {
         Logger.error(`Loader join error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
