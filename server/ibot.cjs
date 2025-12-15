@@ -1082,6 +1082,8 @@ const MicTask = {
         return new Promise((resolve) => {
             let micCheckInterval = null;
             let onMic = false;
+            let waitingForMembership = false;
+            let micTimeComplete = false;
 
             const timeout = setTimeout(() => {
                 if (micCheckInterval) clearInterval(micCheckInterval);
@@ -1090,7 +1092,9 @@ const MicTask = {
             }, CONFIG.TIMEOUTS.MIC_TASK);
 
             const startMicTask = () => {
-                // First check membership status before starting loop
+                // First check membership status before doing anything
+                Logger.debug(`Checking initial membership status for ${botId}`);
+                waitingForMembership = true;
                 connection.checkMembershipStatus();
                 
                 micCheckInterval = setInterval(() => {
@@ -1102,15 +1106,26 @@ const MicTask = {
                         return;
                     }
 
-                    // Always check membership status first
-                    connection.checkMembershipStatus();
+                    // Don't do anything while waiting for membership response
+                    if (waitingForMembership) {
+                        Logger.debug(`${botId} waiting for membership response...`);
+                        return;
+                    }
+
+                    // If mic time is already complete, don't send /mic
+                    if (micTimeComplete) {
+                        return;
+                    }
                     
                     if (!onMic) {
-                        // Only send /mic if not already on mic
+                        // Send /mic command to get on mic
                         Logger.debug(`Sending /mic command for ${botId}`);
                         connection.sendMicCommand();
                     } else {
-                        Logger.debug(`${botId} is on mic, waiting for mic time`);
+                        // On mic, check if we earned mic time
+                        Logger.debug(`${botId} is on mic, checking membership status`);
+                        waitingForMembership = true;
+                        connection.checkMembershipStatus();
                     }
                 }, CONFIG.MIC_SETTINGS.CHECK_INTERVAL);
 
@@ -1125,12 +1140,17 @@ const MicTask = {
             });
 
             connection.on('membershipChecked', (data) => {
+                waitingForMembership = false;
+                
                 if (data.micTime) {
+                    micTimeComplete = true;
                     clearInterval(micCheckInterval);
                     clearTimeout(timeout);
                     TaskState.mic.active.delete(botId);
-                    Logger.success(`Mic task completed for ${botId}`);
+                    Logger.success(`Mic task completed for ${botId} - mic time earned!`);
                     resolve({ success: true, data });
+                } else {
+                    Logger.debug(`${botId} mic time not complete yet, continuing...`);
                 }
             });
 
