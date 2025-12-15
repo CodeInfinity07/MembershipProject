@@ -260,7 +260,6 @@ class BotConnection extends EventEmitter {
         this.ws.on('message', (data) => {
             try {
                 const msg = Utils.decodeFrame(data);
-                console.log(msg)
                 this.handleMessage(msg);
             } catch (error) {
                 Logger.error(`Message parse error for ${this.bot.name}: ${error.message}`);
@@ -1012,17 +1011,27 @@ const MessageTask = {
         return new Promise((resolve) => {
             let messageCount = 0;
             let messageInterval = null;
+            let resolved = false;
+
+            const cleanup = () => {
+                if (messageInterval) clearInterval(messageInterval);
+                connection.removeListener('clubJoined', startSending);
+            };
 
             const timeout = setTimeout(() => {
-                if (messageInterval) clearInterval(messageInterval);
+                if (resolved) return;
+                resolved = true;
+                cleanup();
                 resolve({ success: false, error: 'Timeout', messagesSent: messageCount });
             }, CONFIG.TIMEOUTS.MESSAGE_TASK);
 
             const startSending = () => {
                 messageInterval = setInterval(() => {
                     if (!TaskState.message.isRunning) {
-                        clearInterval(messageInterval);
+                        if (resolved) return;
+                        resolved = true;
                         clearTimeout(timeout);
+                        cleanup();
                         resolve({ success: false, error: 'Task stopped', messagesSent: messageCount });
                         return;
                     }
@@ -1032,13 +1041,17 @@ const MessageTask = {
                         Logger.debug(`Bot ${botId} sent message ${messageCount}/${CONFIG.MESSAGE_SETTINGS.TOTAL_MESSAGES}`);
 
                         if (messageCount >= CONFIG.MESSAGE_SETTINGS.TOTAL_MESSAGES) {
-                            clearInterval(messageInterval);
+                            if (resolved) return;
+                            resolved = true;
                             clearTimeout(timeout);
+                            cleanup();
                             resolve({ success: true, messagesSent: messageCount });
                         }
                     } else {
-                        clearInterval(messageInterval);
+                        if (resolved) return;
+                        resolved = true;
                         clearTimeout(timeout);
+                        cleanup();
                         resolve({ success: false, error: 'Failed to send', messagesSent: messageCount });
                     }
                 }, CONFIG.DELAYS.BETWEEN_MESSAGES);
@@ -2349,19 +2362,19 @@ app.post('/api/loader/connect', async (req, res) => {
         
         const botIds = botsToConnect.map(b => b.botId);
         
-        for (const botId of botIds) {
-            // Check if connection already exists, reuse it instead of creating new one
-            let connection = connectionManager.getConnection(botId);
-            if (!connection) {
-                const bot = connectionManager.getBot(botId);
-                if (bot) {
-                    connection = new BotConnection(bot, botId);
-                    connectionManager.addConnection(botId, connection);
-                }
-            }
+        if (botIds.length === 0) {
+            return res.json({ success: false, message: 'No bots available to connect' });
         }
         
-        res.json({ success: true, message: `Connecting ${botIds.length} bots` });
+        res.json({ success: true, message: `Connecting ${botIds.length} bots...` });
+        
+        // Connect in background using the proper connectBot method
+        (async () => {
+            for (const botId of botIds) {
+                await connectionManager.connectBot(botId);
+                await Utils.delay(500);
+            }
+        })();
     } catch (error) {
         Logger.error(`Loader connect error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
