@@ -861,24 +861,40 @@ const MembershipTask = {
         }
 
         return new Promise((resolve) => {
+            let resolved = false;
+            
+            const cleanup = () => {
+                connection.removeListener('membershipChecked', onMembershipChecked);
+                connection.removeListener('clubJoined', onClubJoined);
+            };
+            
+            const onMembershipChecked = (data) => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeout);
+                cleanup();
+                resolve({ success: true, data });
+            };
+            
+            const onClubJoined = () => {
+                setTimeout(() => {
+                    connection.checkMembershipStatus(CONFIG.CLUB_CODE);
+                }, 1000);
+            };
+            
             const timeout = setTimeout(() => {
+                if (resolved) return;
+                resolved = true;
+                cleanup();
                 resolve({ success: false, error: 'Timeout' });
             }, CONFIG.TIMEOUTS.MEMBERSHIP_CHECK);
 
-            connection.once('membershipChecked', (data) => {
-                clearTimeout(timeout);
-                resolve({ success: true, data });
-            });
+            connection.once('membershipChecked', onMembershipChecked);
 
             // Join club and check membership
             if (!connection.isInClub) {
                 connection.joinClub(CONFIG.CLUB_CODE);
-                
-                connection.once('clubJoined', () => {
-                    setTimeout(() => {
-                        connection.checkMembershipStatus(CONFIG.CLUB_CODE);
-                    }, 1000);
-                });
+                connection.once('clubJoined', onClubJoined);
             } else {
                 connection.checkMembershipStatus(CONFIG.CLUB_CODE);
             }
@@ -1140,10 +1156,43 @@ const MicTask = {
             let onMic = false;
             let waitingForMembership = false;
             let micTimeComplete = false;
+            let resolved = false;
+
+            const cleanup = () => {
+                if (micCheckInterval) clearInterval(micCheckInterval);
+                connection.removeListener('micInviteAccepted', onMicInviteAccepted);
+                connection.removeListener('membershipChecked', onMembershipChecked);
+                connection.removeListener('clubJoined', startMicTask);
+                TaskState.mic.active.delete(botId);
+            };
+
+            const onMicInviteAccepted = () => {
+                onMic = true;
+                const state = TaskState.mic.active.get(botId);
+                if (state) state.onMic = true;
+                Logger.success(`${botId} accepted mic invite`);
+            };
+
+            const onMembershipChecked = (data) => {
+                waitingForMembership = false;
+                
+                if (data.micTime) {
+                    if (resolved) return;
+                    resolved = true;
+                    micTimeComplete = true;
+                    clearTimeout(timeout);
+                    cleanup();
+                    Logger.success(`Mic task completed for ${botId} - mic time earned!`);
+                    resolve({ success: true, data });
+                } else {
+                    Logger.debug(`${botId} mic time not complete yet, continuing...`);
+                }
+            };
 
             const timeout = setTimeout(() => {
-                if (micCheckInterval) clearInterval(micCheckInterval);
-                TaskState.mic.active.delete(botId);
+                if (resolved) return;
+                resolved = true;
+                cleanup();
                 resolve({ success: false, error: 'Timeout' });
             }, CONFIG.TIMEOUTS.MIC_TASK);
 
@@ -1155,9 +1204,10 @@ const MicTask = {
                 
                 micCheckInterval = setInterval(() => {
                     if (!TaskState.mic.isRunning) {
-                        clearInterval(micCheckInterval);
+                        if (resolved) return;
+                        resolved = true;
                         clearTimeout(timeout);
-                        TaskState.mic.active.delete(botId);
+                        cleanup();
                         resolve({ success: false, error: 'Task stopped' });
                         return;
                     }
@@ -1188,27 +1238,8 @@ const MicTask = {
                 TaskState.mic.active.set(botId, { onMic: false });
             };
 
-            connection.on('micInviteAccepted', () => {
-                onMic = true;
-                const state = TaskState.mic.active.get(botId);
-                if (state) state.onMic = true;
-                Logger.success(`${botId} accepted mic invite`);
-            });
-
-            connection.on('membershipChecked', (data) => {
-                waitingForMembership = false;
-                
-                if (data.micTime) {
-                    micTimeComplete = true;
-                    clearInterval(micCheckInterval);
-                    clearTimeout(timeout);
-                    TaskState.mic.active.delete(botId);
-                    Logger.success(`Mic task completed for ${botId} - mic time earned!`);
-                    resolve({ success: true, data });
-                } else {
-                    Logger.debug(`${botId} mic time not complete yet, continuing...`);
-                }
-            });
+            connection.on('micInviteAccepted', onMicInviteAccepted);
+            connection.on('membershipChecked', onMembershipChecked);
 
             if (!connection.isInClub) {
                 connection.joinClub(CONFIG.CLUB_CODE);
