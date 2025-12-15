@@ -2500,6 +2500,26 @@ app.post('/api/loader/join', async (req, res) => {
     }
 });
 
+app.post('/api/loader/leave', (req, res) => {
+    try {
+        const connectedBots = connectionManager.getAllConnectedBots();
+        let leftCount = 0;
+        
+        for (const botId of connectedBots) {
+            const connection = connectionManager.getConnection(botId);
+            if (connection && connection.isInClub) {
+                connection.leaveClub();
+                leftCount++;
+            }
+        }
+        
+        res.json({ success: true, message: `${leftCount} bots left the club` });
+    } catch (error) {
+        Logger.error(`Loader leave error: ${error.message}`);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 app.post('/api/loader/stop', (req, res) => {
     try {
         MembershipTask.stop();

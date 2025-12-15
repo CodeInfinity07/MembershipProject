@@ -62,15 +62,15 @@ export default function LoaderPage() {
     },
   });
 
-  // Leave/Stop mutation
-  const stopMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/loader/stop'),
+  // Leave club mutation (without disconnecting)
+  const leaveMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/loader/leave'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bots'] });
-      toast({ title: "Left club and disconnected" });
+      toast({ title: "Left club" });
     },
     onError: () => {
-      toast({ title: "Failed to stop", variant: "destructive" });
+      toast({ title: "Failed to leave club", variant: "destructive" });
     },
   });
 
@@ -180,14 +180,14 @@ export default function LoaderPage() {
               </Button>
 
               <Button
-                onClick={() => stopMutation.mutate()}
-                disabled={!hasBotsInClub || stopMutation.isPending}
+                onClick={() => leaveMutation.mutate()}
+                disabled={!hasBotsInClub || leaveMutation.isPending}
                 className="w-full"
                 variant="destructive"
-                data-testid="button-stop"
+                data-testid="button-leave"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                {stopMutation.isPending ? "Leaving..." : "Leave Club"}
+                {leaveMutation.isPending ? "Leaving..." : "Leave Club"}
               </Button>
             </div>
 
