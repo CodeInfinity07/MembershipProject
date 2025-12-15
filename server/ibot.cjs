@@ -1145,6 +1145,12 @@ const MessageTask = {
                 // Update bot data
                 connectionManager.updateBotData(botId, { message: true });
                 
+                // Also update TaskState.membership.results so the status API reflects the change
+                const existingMembershipData = TaskState.membership.results.get(botId);
+                if (existingMembershipData) {
+                    TaskState.membership.results.set(botId, { ...existingMembershipData, message: true });
+                }
+                
                 Logger.success(`Message task completed for ${botId}`);
             } else {
                 TaskState.message.failed++;
@@ -1371,6 +1377,12 @@ const MicTask = {
                     
                     // Update bot data
                     connectionManager.updateBotData(botId, { micTime: true });
+                    
+                    // Also update TaskState.membership.results so the status API reflects the change
+                    const existingMembershipData = TaskState.membership.results.get(botId);
+                    if (existingMembershipData) {
+                        TaskState.membership.results.set(botId, { ...existingMembershipData, micTime: true });
+                    }
                 } else {
                     TaskState.mic.failed++;
                     Logger.error(`Mic task failed for ${botId}: ${result.error}`);
