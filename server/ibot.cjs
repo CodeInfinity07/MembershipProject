@@ -165,6 +165,9 @@ const FileManager = {
             try {
                 await fs.copyFile(CONFIG.BOTS_FILE, backup);
                 Logger.debug(`Created backup: ${backup}`);
+                
+                // Clean up old backups - keep only last 5
+                await this.cleanupOldBackups();
             } catch (backupError) {
                 Logger.warn(`Backup creation failed: ${backupError.message}`);
             }
@@ -174,6 +177,28 @@ const FileManager = {
         } catch (error) {
             Logger.error(`Save failed: ${error.message}`);
             return false;
+        }
+    },
+
+    async cleanupOldBackups() {
+        try {
+            const dir = path.dirname(CONFIG.BOTS_FILE);
+            const basename = path.basename(CONFIG.BOTS_FILE);
+            const files = await fs.readdir(dir);
+            
+            const backupFiles = files
+                .filter(f => f.startsWith(`${basename}.backup.`))
+                .map(f => ({ name: f, time: parseInt(f.split('.backup.')[1]) || 0 }))
+                .sort((a, b) => b.time - a.time);
+            
+            // Keep only last 5 backups
+            const toDelete = backupFiles.slice(5);
+            for (const file of toDelete) {
+                await fs.unlink(path.join(dir, file.name));
+                Logger.debug(`Deleted old backup: ${file.name}`);
+            }
+        } catch (error) {
+            Logger.debug(`Backup cleanup skipped: ${error.message}`);
         }
     },
 
@@ -818,6 +843,19 @@ const connectionManager = new PersistentConnectionManager();
 // ==================== AUTH PROMPTS STORAGE ====================
 const authPrompts = new Map(); // botId -> { botId, botName, message, timestamp }
 
+// Clean up stale auth prompts every 5 minutes (prompts older than 10 minutes)
+setInterval(() => {
+    const now = Date.now();
+    const maxAge = 10 * 60 * 1000; // 10 minutes
+    authPrompts.forEach((prompt, botId) => {
+        const promptTime = new Date(prompt.timestamp).getTime();
+        if (now - promptTime > maxAge) {
+            authPrompts.delete(botId);
+            Logger.debug(`Cleaned up stale auth prompt for ${botId}`);
+        }
+    });
+}, 5 * 60 * 1000);
+
 // ==================== TASK STATE ====================
 const TaskState = {
     membership: {
@@ -892,7 +930,15 @@ const MembershipTask = {
 
             // Join club and check membership
             if (!connection.isInClub) {
-                connection.joinClub(CONFIG.CLUB_CODE);
+                const joined = connection.joinClub(CONFIG.CLUB_CODE);
+                if (!joined) {
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timeout);
+                    cleanup();
+                    resolve({ success: false, error: 'Failed to join club' });
+                    return;
+                }
                 connection.once('clubJoined', onClubJoined);
             } else {
                 connection.checkMembershipStatus(CONFIG.CLUB_CODE);
@@ -1058,7 +1104,15 @@ const MessageTask = {
             };
 
             if (!connection.isInClub) {
-                connection.joinClub(CONFIG.CLUB_CODE);
+                const joined = connection.joinClub(CONFIG.CLUB_CODE);
+                if (!joined) {
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timeout);
+                    cleanup();
+                    resolve({ success: false, error: 'Failed to join club', messagesSent: 0 });
+                    return;
+                }
                 connection.once('clubJoined', startSending);
             } else {
                 startSending();
@@ -1253,9 +1307,29 @@ const MicTask = {
 
             connection.on('micInviteAccepted', onMicInviteAccepted);
             connection.on('membershipChecked', onMembershipChecked);
+            
+            // Listen for disconnection to clean up properly
+            const onDisconnected = () => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeout);
+                cleanup();
+                connection.removeListener('disconnected', onDisconnected);
+                resolve({ success: false, error: 'Bot disconnected' });
+            };
+            connection.once('disconnected', onDisconnected);
 
             if (!connection.isInClub) {
-                connection.joinClub(CONFIG.CLUB_CODE);
+                const joined = connection.joinClub(CONFIG.CLUB_CODE);
+                if (!joined) {
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timeout);
+                    cleanup();
+                    connection.removeListener('disconnected', onDisconnected);
+                    resolve({ success: false, error: 'Failed to join club' });
+                    return;
+                }
                 connection.once('clubJoined', startMicTask);
             } else {
                 startMicTask();
@@ -2000,10 +2074,14 @@ app.post('/api/bots/bulk/connect', async (req, res) => {
 
         res.json({ success: true, message: `Connecting ${botIds.length} bots...` });
 
-        // Connect in background
+        // Connect in background with error handling
         (async () => {
             for (const botId of botIds) {
-                await connectionManager.connectBot(botId);
+                try {
+                    await connectionManager.connectBot(botId);
+                } catch (error) {
+                    Logger.error(`Failed to connect bot ${botId}: ${error.message}`);
+                }
                 await Utils.delay(500);
             }
         })();
@@ -2368,10 +2446,14 @@ app.post('/api/loader/connect', async (req, res) => {
         
         res.json({ success: true, message: `Connecting ${botIds.length} bots...` });
         
-        // Connect in background using the proper connectBot method
+        // Connect in background using the proper connectBot method with error handling
         (async () => {
             for (const botId of botIds) {
-                await connectionManager.connectBot(botId);
+                try {
+                    await connectionManager.connectBot(botId);
+                } catch (error) {
+                    Logger.error(`Failed to connect bot ${botId}: ${error.message}`);
+                }
                 await Utils.delay(500);
             }
         })();
