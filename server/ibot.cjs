@@ -1090,6 +1090,9 @@ const MicTask = {
             }, CONFIG.TIMEOUTS.MIC_TASK);
 
             const startMicTask = () => {
+                // First check membership status before starting loop
+                connection.checkMembershipStatus();
+                
                 micCheckInterval = setInterval(() => {
                     if (!TaskState.mic.isRunning) {
                         clearInterval(micCheckInterval);
@@ -1099,12 +1102,15 @@ const MicTask = {
                         return;
                     }
 
+                    // Always check membership status first
+                    connection.checkMembershipStatus();
+                    
                     if (!onMic) {
+                        // Only send /mic if not already on mic
                         Logger.debug(`Sending /mic command for ${botId}`);
                         connection.sendMicCommand();
                     } else {
-                        Logger.debug(`${botId} is on mic, checking status`);
-                        connection.checkMembershipStatus();
+                        Logger.debug(`${botId} is on mic, waiting for mic time`);
                     }
                 }, CONFIG.MIC_SETTINGS.CHECK_INTERVAL);
 
