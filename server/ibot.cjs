@@ -1010,9 +1010,11 @@ const MembershipTask = {
                     micTimeValue = bot.membership.micTime === true;
                 } else if (typeof bot.membership === 'boolean') {
                     membershipValue = bot.membership;
-                    messageValue = bot.message || false;
-                    micTimeValue = bot.micTime || false;
                 }
+                
+                // Also check top-level fields (set by message/mic tasks)
+                if (bot.message === true) messageValue = true;
+                if (bot.micTime === true) micTimeValue = true;
                 
                 return {
                     name: bot.name,
@@ -1185,9 +1187,11 @@ const MessageTask = {
                     micTimeValue = bot.membership.micTime === true;
                 } else if (typeof bot.membership === 'boolean') {
                     membershipValue = bot.membership;
-                    messageValue = bot.message || false;
-                    micTimeValue = bot.micTime || false;
                 }
+                
+                // Also check top-level fields (set by message/mic tasks)
+                if (bot.message === true) messageValue = true;
+                if (bot.micTime === true) micTimeValue = true;
                 
                 return {
                     name: bot.name,
@@ -1197,8 +1201,8 @@ const MessageTask = {
                     snuid: bot.snuid,
                     ui: bot.ui,
                     membership: membershipValue,
-                    message: messageValue || false,
-                    micTime: micTimeValue || false,
+                    message: messageValue,
+                    micTime: micTimeValue,
                     lastChecked: bot.lastChecked || null
                 };
             });
@@ -1416,9 +1420,11 @@ const MicTask = {
                     micTimeValue = bot.membership.micTime === true;
                 } else if (typeof bot.membership === 'boolean') {
                     membershipValue = bot.membership;
-                    messageValue = bot.message || false;
-                    micTimeValue = bot.micTime || false;
                 }
+                
+                // Also check top-level fields (set by message/mic tasks)
+                if (bot.message === true) messageValue = true;
+                if (bot.micTime === true) micTimeValue = true;
                 
                 return {
                     name: bot.name,
@@ -1428,8 +1434,8 @@ const MicTask = {
                     snuid: bot.snuid,
                     ui: bot.ui,
                     membership: membershipValue,
-                    message: messageValue || false,
-                    micTime: micTimeValue || false,
+                    message: messageValue,
+                    micTime: micTimeValue,
                     lastChecked: bot.lastChecked || null
                 };
             });
@@ -2256,14 +2262,23 @@ app.get('/api/tasks/message/status', (req, res) => {
         const stats = connectionManager.getStats();
         const taskState = TaskState.message;
         
+        const totalEligible = taskState.total || stats.connected;
+        const completed = taskState.completed || 0;
+        const failed = taskState.failed || 0;
+        const remaining = Math.max(0, totalEligible - completed - failed);
+        const processing = taskState.isRunning ? Math.min(1, remaining) : 0;
+        
         res.json({ 
             success: true,
-            isChecking: taskState.isRunning,
-            totalBots: stats.totalBots,
-            connectedBots: stats.connected,
-            completed: taskState.completed,
-            failed: taskState.failed,
-            completedBots: Array.from(taskState.completedBots),
+            taskStatus: {
+                isRunning: taskState.isRunning,
+                totalEligible: totalEligible,
+                completed: completed,
+                processing: processing,
+                remaining: remaining,
+                failed: failed,
+                eligibleBots: totalEligible
+            },
             bots: allBots
         });
     } catch (error) {
