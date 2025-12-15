@@ -2311,22 +2311,34 @@ app.get('/api/tasks/mic/status', (req, res) => {
         const stats = connectionManager.getStats();
         const taskState = TaskState.mic;
         
-        // Convert active Map to an object for JSON serialization
-        const activeObj = {};
+        // Convert active Map to array of active connections
+        const activeConnections = [];
         taskState.active.forEach((value, key) => {
-            activeObj[key] = value;
+            activeConnections.push({
+                connectionId: key,
+                botName: value.botName || key,
+                onMic: value.onMic || false,
+                uptime: value.uptime || 0,
+                lastActivity: value.lastActivity || Date.now()
+            });
         });
+        
+        const totalEligible = taskState.total || stats.connected;
+        const completed = taskState.completed || 0;
+        const failed = taskState.failed || 0;
+        const remaining = Math.max(0, totalEligible - completed - failed);
         
         res.json({ 
             success: true,
-            isChecking: taskState.isRunning,
-            totalBots: stats.totalBots,
-            connectedBots: stats.connected,
-            completed: taskState.completed,
-            failed: taskState.failed,
-            activeCount: taskState.active.size,
-            active: activeObj,
-            completedBots: Array.from(taskState.completedBots),
+            taskStatus: {
+                isRunning: taskState.isRunning,
+                totalEligible: totalEligible,
+                completed: completed,
+                remaining: remaining,
+                failed: failed,
+                eligibleBots: totalEligible,
+                activeConnections: activeConnections
+            },
             bots: allBots
         });
     } catch (error) {
