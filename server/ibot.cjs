@@ -2194,10 +2194,11 @@ app.get('/api/tasks/membership/status', (req, res) => {
         
         // Merge bot data with membership results
         const botsWithMembership = allBots.map(bot => {
-            const botId = `bot_${bot.gc}`;
-            const membershipData = resultsObj[botId];
+            // Use bot.botId directly (already in correct format) instead of reconstructing
+            const membershipData = resultsObj[bot.botId];
             return {
                 ...bot,
+                // Prefer TaskState results, then bot.membership from updateBotData, then nothing
                 ...(membershipData && { membership: membershipData })
             };
         });
