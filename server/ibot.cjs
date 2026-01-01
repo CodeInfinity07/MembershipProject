@@ -455,7 +455,7 @@ class BotConnection extends EventEmitter {
             RH: "CBC",
             PU: "TMS",
             SQ: this.sequenceNumber++,
-            PY: JSON.stringify({ MN: 1, TM: true, RS: true })
+            PY: JSON.stringify({ TM: true, RS: true })
         };
 
         if (Utils.sendMessage(this.ws, JSON.stringify(response))) {
@@ -1166,6 +1166,13 @@ const MessageTask = {
             if (!TaskState.message.isRunning) break;
 
             const result = await this.sendMessages(botId);
+            
+            // Leave club after messages sent (regardless of success/failure)
+            const connection = connectionManager.getConnection(botId);
+            if (connection && connection.isInClub) {
+                connection.leaveClub();
+                Logger.info(`Bot ${botId} left club after message task`);
+            }
             
             if (result.success) {
                 TaskState.message.completed++;
