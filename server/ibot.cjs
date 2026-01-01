@@ -1395,7 +1395,7 @@ const MicTask = {
 
         Logger.info(`Starting mic task for ${botIds.length} bots`);
 
-        // Process in batches
+        // Process in batches with staggered joins (200ms between each bot)
         const maxConcurrent = CONFIG.MIC_SETTINGS.MAX_CONCURRENT;
         for (let i = 0; i < botIds.length; i += maxConcurrent) {
             if (!TaskState.mic.isRunning) break;
@@ -1403,7 +1403,15 @@ const MicTask = {
             const batch = botIds.slice(i, i + maxConcurrent);
             Logger.info(`Processing batch ${Math.floor(i / maxConcurrent) + 1}: ${batch.length} bots`);
             
-            const promises = batch.map(botId => this.setupMicBot(botId));
+            // Start bots with 200ms delay between each
+            const promises = batch.map((botId, index) => 
+                new Promise(resolve => {
+                    setTimeout(async () => {
+                        const result = await this.setupMicBot(botId);
+                        resolve(result);
+                    }, index * 200); // 200ms gap between each bot
+                })
+            );
 
             const results = await Promise.all(promises);
             
