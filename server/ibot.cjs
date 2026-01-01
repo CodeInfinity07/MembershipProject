@@ -365,9 +365,15 @@ class BotConnection extends EventEmitter {
         if (msg.RH === "cr") {
             Logger.debug(`Received error message for ${this.bot.name}`);
         }
+        
+        // Log all PU messages for debugging
+        if (msg.PU) {
+            Logger.debug(`[MSG_DEBUG] Bot ${this.bot.name} received PU=${msg.PU}`);
+        }
 
         // Handle club join responses
         if (msg.PU === "CJA" || msg.PU === "REA") {
+            Logger.info(`[CLUB_JOIN] Bot ${this.bot.name} received ${msg.PU} response - marking as in club`);
             this.isInClub = true;
             
             // Clear join timeout
@@ -376,6 +382,14 @@ class BotConnection extends EventEmitter {
                 this.timeouts.delete('clubJoin');
             }
             
+            Logger.info(`[CLUB_JOIN] Bot ${this.bot.name} emitting clubJoined event`);
+            this.emit('clubJoined');
+        }
+        
+        // Also handle CJIA (Club Join In Already) - bot is already in the club
+        if (msg.PU === "CJIA") {
+            Logger.info(`[CLUB_JOIN] Bot ${this.bot.name} received CJIA (already in club)`);
+            this.isInClub = true;
             this.emit('clubJoined');
         }
 
@@ -1074,6 +1088,7 @@ const MessageTask = {
             }, CONFIG.TIMEOUTS.MESSAGE_TASK);
 
             const startSending = () => {
+                Logger.info(`[MESSAGE_TASK] Bot ${botId} startSending called, beginning message interval`);
                 messageInterval = setInterval(() => {
                     if (!TaskState.message.isRunning) {
                         if (resolved) return;
@@ -1084,7 +1099,9 @@ const MessageTask = {
                         return;
                     }
 
-                    if (connection.sendClubMessage(messageCount.toString())) {
+                    const sendResult = connection.sendClubMessage(messageCount.toString());
+                    Logger.debug(`[MESSAGE_TASK] Bot ${botId} sendClubMessage result: ${sendResult}`);
+                    if (sendResult) {
                         messageCount++;
                         Logger.debug(`Bot ${botId} sent message ${messageCount}/${CONFIG.MESSAGE_SETTINGS.TOTAL_MESSAGES}`);
 
@@ -1106,8 +1123,10 @@ const MessageTask = {
             };
 
             if (!connection.isInClub) {
+                Logger.info(`[MESSAGE_TASK] Bot ${botId} not in club, joining...`);
                 const joined = connection.joinClub(CONFIG.CLUB_CODE);
                 if (!joined) {
+                    Logger.error(`[MESSAGE_TASK] Bot ${botId} failed to send join request`);
                     if (resolved) return;
                     resolved = true;
                     clearTimeout(timeout);
@@ -1115,8 +1134,10 @@ const MessageTask = {
                     resolve({ success: false, error: 'Failed to join club', messagesSent: 0 });
                     return;
                 }
+                Logger.info(`[MESSAGE_TASK] Bot ${botId} join request sent, waiting for clubJoined event`);
                 connection.once('clubJoined', startSending);
             } else {
+                Logger.info(`[MESSAGE_TASK] Bot ${botId} already in club, starting immediately`);
                 startSending();
             }
         });
