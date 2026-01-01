@@ -70,16 +70,21 @@ const Utils = {
         EN: true
     }),
 
-    createJoinClubMessage: (clubCode) => JSON.stringify({
+    createJoinClubMessage: (clubCode, bot) => JSON.stringify({
         RH: "CBC",
         PU: "CJ",
         PY: JSON.stringify({
             IDX: "1",
             CID: clubCode.toString(),
             PI: {
-                GA: false, NM: "♜NAILA DON♜", XP: 0, AD: "", ABI: "", CV: 289, WS: 0, PT: 3, LV: 1,
-                snuid: "", GC: "GOHO9614", PBI: "", VT: 0, TID: 0, SEI: {}, AF: "", LVT: 0, AV: "",
-                UI: "683c3e356aac4e0001161afa", CLR: [], SLBR: 0, LLC: "PK"
+                GA: false, 
+                NM: bot?.name || "Bot", 
+                XP: 0, AD: "", ABI: "", CV: 289, WS: 0, PT: 3, LV: 1,
+                snuid: bot?.snuid || "", 
+                GC: bot?.gc || "", 
+                PBI: "", VT: 0, TID: 0, SEI: {}, AF: "", LVT: 0, AV: "",
+                UI: bot?.ui || "", 
+                CLR: [], SLBR: 0, LLC: "PK"
             },
             JTY: "15", CF: 0
         })
@@ -475,7 +480,8 @@ class BotConnection extends EventEmitter {
             return false;
         }
 
-        if (!Utils.sendMessage(this.ws, Utils.createJoinClubMessage(clubCode))) {
+        // Pass bot data to create proper join message with correct identity
+        if (!Utils.sendMessage(this.ws, Utils.createJoinClubMessage(clubCode, this.bot))) {
             return false;
         }
 
