@@ -380,6 +380,7 @@ class BotConnection extends EventEmitter {
         if (msg.PU === "CJA" || msg.PU === "REA") {
             Logger.info(`[CLUB_JOIN] Bot ${this.bot.name} received ${msg.PU} response - marking as in club`);
             this.isInClub = true;
+            this.sequenceNumber = 2; // Reset sequence number on club join
             
             // Clear join timeout
             if (this.timeouts.has('clubJoin')) {
@@ -395,6 +396,7 @@ class BotConnection extends EventEmitter {
         if (msg.PU === "CJIA") {
             Logger.info(`[CLUB_JOIN] Bot ${this.bot.name} received CJIA (already in club)`);
             this.isInClub = true;
+            this.sequenceNumber = 2; // Reset sequence number on club join
             this.emit('clubJoined');
         }
 
@@ -1417,6 +1419,14 @@ const MicTask = {
             
             results.forEach((result, index) => {
                 const botId = batch[index];
+                
+                // Leave club after mic task (regardless of success/failure)
+                const connection = connectionManager.getConnection(botId);
+                if (connection && connection.isInClub) {
+                    connection.leaveClub();
+                    Logger.info(`Bot ${botId} left club after mic task`);
+                }
+                
                 if (result.success) {
                     TaskState.mic.completed++;
                     TaskState.mic.completedBots.add(botId);
