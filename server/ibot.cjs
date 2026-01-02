@@ -26,7 +26,7 @@ const CONFIG = {
     },
 
     DELAYS: {
-        BETWEEN_MESSAGES: 600,
+        BETWEEN_MESSAGES: 200,
         MIC_CHECK_INTERVAL: 25000,
         RETRY_DELAY: 3000,
         KEEPALIVE_INTERVAL: 15000,
