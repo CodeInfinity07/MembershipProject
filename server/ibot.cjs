@@ -1411,7 +1411,7 @@ const MicTask = {
                     setTimeout(async () => {
                         const result = await this.setupMicBot(botId);
                         resolve(result);
-                    }, index * 200); // 200ms gap between each bot
+                    }, index * 1000); // 1 second gap between each bot
                 })
             );
 
