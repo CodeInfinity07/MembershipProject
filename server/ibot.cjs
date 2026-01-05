@@ -2355,12 +2355,42 @@ app.post('/api/tasks/message/start', async (req, res) => {
             }
         }
 
+        // Filter for eligible bots only: must be member AND not completed message task
+        const eligibleBots = botsToUse.filter(botId => {
+            const bot = connectionManager.bots.get(botId);
+            if (!bot) return false;
+            
+            let isMember = false;
+            let messageComplete = false;
+            
+            // Check membership status from bot data or TaskState results
+            const membershipData = TaskState.membership.results.get(botId);
+            if (membershipData) {
+                isMember = membershipData.membership === true;
+                messageComplete = membershipData.message === true;
+            } else if (typeof bot.membership === 'object' && bot.membership !== null) {
+                isMember = bot.membership.membership === true;
+                messageComplete = bot.membership.message === true;
+            } else if (typeof bot.membership === 'boolean') {
+                isMember = bot.membership;
+                messageComplete = bot.message === true;
+            }
+            
+            return isMember && !messageComplete;
+        });
+
+        if (eligibleBots.length === 0) {
+            return res.status(400).json({ success: false, message: 'No eligible bots (must be members without completed message task)' });
+        }
+
+        Logger.info(`Message task: ${eligibleBots.length} eligible out of ${botsToUse.length} connected`);
+
         res.json({ 
             success: true, 
-            message: `Starting message task for ${botsToUse.length} bots`,
-            connectedBots: botsToUse.length
+            message: `Starting message task for ${eligibleBots.length} eligible bots`,
+            connectedBots: eligibleBots.length
         });
-        MessageTask.run(botsToUse);
+        MessageTask.run(eligibleBots);
     } catch (error) {
         Logger.error(`Message task error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
@@ -2430,12 +2460,42 @@ app.post('/api/tasks/mic/start', async (req, res) => {
             }
         }
 
+        // Filter for eligible bots only: must be member AND not completed mic task
+        const eligibleBots = botsToUse.filter(botId => {
+            const bot = connectionManager.bots.get(botId);
+            if (!bot) return false;
+            
+            let isMember = false;
+            let micComplete = false;
+            
+            // Check membership status from bot data or TaskState results
+            const membershipData = TaskState.membership.results.get(botId);
+            if (membershipData) {
+                isMember = membershipData.membership === true;
+                micComplete = membershipData.micTime === true;
+            } else if (typeof bot.membership === 'object' && bot.membership !== null) {
+                isMember = bot.membership.membership === true;
+                micComplete = bot.membership.micTime === true;
+            } else if (typeof bot.membership === 'boolean') {
+                isMember = bot.membership;
+                micComplete = bot.micTime === true;
+            }
+            
+            return isMember && !micComplete;
+        });
+
+        if (eligibleBots.length === 0) {
+            return res.status(400).json({ success: false, message: 'No eligible bots (must be members without completed mic task)' });
+        }
+
+        Logger.info(`Mic task: ${eligibleBots.length} eligible out of ${botsToUse.length} connected`);
+
         res.json({ 
             success: true, 
-            message: `Starting mic task for ${botsToUse.length} bots`,
-            connectedBots: botsToUse.length
+            message: `Starting mic task for ${eligibleBots.length} eligible bots`,
+            connectedBots: eligibleBots.length
         });
-        MicTask.run(botsToUse);
+        MicTask.run(eligibleBots);
     } catch (error) {
         Logger.error(`Mic task error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
