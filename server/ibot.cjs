@@ -2636,16 +2636,18 @@ app.post('/api/loader/join', async (req, res) => {
         const maxBots = botCount && botCount > 0 ? Math.min(botCount, availableBots.length) : availableBots.length;
         const botsToJoin = availableBots.slice(0, maxBots);
         
-        let joinedCount = 0;
-        for (const botId of botsToJoin) {
-            const connection = connectionManager.getConnection(botId);
-            if (connection) {
-                connection.joinClub(targetClubCode);
-                joinedCount++;
-            }
-        }
+        res.json({ success: true, message: `Joining ${botsToJoin.length} bots to club ${targetClubCode}` });
         
-        res.json({ success: true, message: `Joining ${joinedCount} bots to club ${targetClubCode}` });
+        // Join in background with 500ms delay between each bot
+        (async () => {
+            for (const botId of botsToJoin) {
+                const connection = connectionManager.getConnection(botId);
+                if (connection) {
+                    connection.joinClub(targetClubCode);
+                }
+                await Utils.delay(500); // 500ms gap between each bot
+            }
+        })();
     } catch (error) {
         Logger.error(`Loader join error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
