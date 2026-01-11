@@ -650,7 +650,7 @@ class BotConnection extends EventEmitter {
         return success;
     }
 
-    sendAVMessage() {
+    sendAVMessage(useFixedAvatar = true) {
         if (!this.isAuthenticated) {
             Logger.warn(`Bot ${this.bot.name}: Cannot send AV message - not authenticated`);
             return false;
@@ -661,11 +661,14 @@ class BotConnection extends EventEmitter {
             return false;
         }
 
+        // Use fixed avatar if enabled, otherwise use bot's snuid
+        const avatarId = useFixedAvatar ? "100015852581827" : (this.bot.snuid || "100015852581827");
+
         const msg = {
             RH: "us",
             PU: "EP",
             PY: JSON.stringify({
-                AV: "100015852581827"
+                AV: avatarId
             })
         };
 
@@ -1508,6 +1511,8 @@ const MicTask = {
 
 // ==================== NAME CHANGE TASK ====================
 const NameChangeTask = {
+    useAvatar: true, // Default to using fixed avatar
+    
     async sendNameToBot(botId, assignedName) {
         const connection = connectionManager.getConnection(botId);
         if (!connection) {
@@ -1522,7 +1527,7 @@ const NameChangeTask = {
 
             await Utils.delay(100);
 
-            const avSuccess = connection.sendAVMessage();
+            const avSuccess = connection.sendAVMessage(this.useAvatar);
             if (!avSuccess) {
                 return { success: false, error: 'Failed to send AV message' };
             }
@@ -1533,7 +1538,8 @@ const NameChangeTask = {
         }
     },
 
-    async run(names) {
+    async run(names, useAvatar = true) {
+        this.useAvatar = useAvatar;
         if (TaskState.nameChange.isRunning) {
             return { success: false, message: 'Name change task already running' };
         }
@@ -2109,7 +2115,7 @@ app.get('/api/name-change/status', (req, res) => {
 
 app.post('/api/name-change/start', async (req, res) => {
     try {
-        const { names } = req.body;
+        const { names, useAvatar = true } = req.body;
         
         if (!names || !Array.isArray(names) || names.length === 0) {
             return res.json({ success: false, message: 'Please provide at least one name' });
@@ -2120,8 +2126,9 @@ app.post('/api/name-change/start', async (req, res) => {
             return res.json({ success: false, message: 'No connected bots available' });
         }
 
-        res.json({ success: true, message: `Starting name change for ${stats.connected} bots` });
-        NameChangeTask.run(names);
+        const avatarMode = useAvatar ? 'fixed avatar' : 'bot\'s own avatar';
+        res.json({ success: true, message: `Starting name change for ${stats.connected} bots (${avatarMode})` });
+        NameChangeTask.run(names, useAvatar);
     } catch (error) {
         Logger.error(`Name change start error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });

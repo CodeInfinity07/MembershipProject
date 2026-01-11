@@ -5,6 +5,7 @@ import { BotList } from "@/components/bot-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UserCog, Info } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,6 +36,7 @@ interface NameChangeStatusResponse {
 export default function NameChangePage() {
   const { toast } = useToast();
   const [names, setNames] = useState("");
+  const [useAvatar, setUseAvatar] = useState(false);
   
   const { data: response } = useQuery<NameChangeStatusResponse>({
     queryKey: ['/api/name-change/status'],
@@ -53,7 +55,7 @@ export default function NameChangePage() {
         throw new Error('Please enter at least one name');
       }
       
-      return apiRequest('POST', '/api/name-change/start', { names: namesList });
+      return apiRequest('POST', '/api/name-change/start', { names: namesList, useAvatar });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/name-change/status'] });
@@ -150,6 +152,22 @@ export default function NameChangePage() {
                 {namesList.length} name{namesList.length !== 1 ? 's' : ''} entered
               </p>
             )}
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox
+              id="avatar"
+              checked={useAvatar}
+              onCheckedChange={(checked) => setUseAvatar(checked === true)}
+              disabled={isRunning}
+              data-testid="checkbox-avatar"
+            />
+            <Label 
+              htmlFor="avatar" 
+              className="text-sm cursor-pointer"
+            >
+              Avatar (use fixed avatar instead of bot's own)
+            </Label>
           </div>
         </TaskControlCard>
 
