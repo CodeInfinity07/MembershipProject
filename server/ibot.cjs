@@ -2679,9 +2679,9 @@ app.post('/api/loader/stop', (req, res) => {
         MembershipTask.stop();
         MessageTask.stop();
         MicTask.stop();
-        connectionManager.disconnectAll();
+        // Don't disconnect bots - keep connections alive
         
-        res.json({ success: true, message: 'Loader stopped' });
+        res.json({ success: true, message: 'Tasks stopped (bots remain connected)' });
     } catch (error) {
         Logger.error(`Loader stop error: ${error.message}`);
         res.status(500).json({ success: false, message: error.message });
