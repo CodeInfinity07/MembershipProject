@@ -663,6 +663,8 @@ class BotConnection extends EventEmitter {
 
         // Use fixed avatar if enabled, otherwise use bot's snuid
         const avatarId = useFixedAvatar ? "100015852581827" : (this.bot.snuid || "100015852581827");
+        
+        Logger.info(`Bot ${this.bot.name}: AV message - useFixedAvatar=${useFixedAvatar}, bot.snuid=${this.bot.snuid}, using avatarId=${avatarId}`);
 
         const msg = {
             RH: "us",
